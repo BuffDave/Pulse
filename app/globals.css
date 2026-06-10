@@ -49,14 +49,24 @@ body {
   left: 50%;
   transform: translateX(-50%);
   margin-bottom: 2px;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
   font-weight: 700;
   color: #ffffff;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 1px 6px;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 3px 10px;
   border-radius: 9999px;
   white-space: nowrap;
   pointer-events: none;
+}
+
+.pulse-gender-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  color: #ffffff;
+  vertical-align: middle;
 }
 
 /* The user's own "you are here" pin — small, sized like the dots. */
@@ -68,19 +78,27 @@ body {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 }
 
-.pulse-me-label {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 1px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #ffffff;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 0 5px;
+.changelog-content {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 #09090b;
+}
+
+.changelog-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.changelog-content::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+.changelog-content::-webkit-scrollbar-thumb {
+  background: #3f3f46;
   border-radius: 9999px;
-  white-space: nowrap;
+  border: 2px solid #09090b;
+}
+
+.changelog-content::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
 }
 
 @keyframes pulse-ring {

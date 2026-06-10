@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { STALE_MS, SIGNAL_TTL_MS } from "@/lib/presence";
-import type { PollResponse } from "@/lib/types";
+import type { Gender, PollResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
       busy: true,
       name: true,
       gender: true,
+      location: true,
     },
   });
 
@@ -67,7 +68,8 @@ export async function GET(request: NextRequest) {
       lng: p.lng,
       busy: p.busy,
       name: p.name,
-      gender: p.gender,
+      gender: p.gender as Gender,
+      location: p.location,
     })),
     signals: inbox.map((s) => ({
       id: s.id,

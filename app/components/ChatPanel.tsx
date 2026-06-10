@@ -41,7 +41,7 @@ export default function ChatPanel({
   }
 
   return (
-    <div className="absolute inset-y-0 right-0 z-20 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl">
+    <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl">
       <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div>
           <p className="font-semibold">{peerName}</p>
@@ -55,7 +55,7 @@ export default function ChatPanel({
             disabled={!connected || videoBusy}
             className="rounded-full border border-zinc-700 px-3 py-1.5 text-sm hover:border-zinc-500 disabled:opacity-40"
           >
-            Video
+            Video call
           </button>
           <button
             onClick={onEnd}

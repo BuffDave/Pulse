@@ -17,6 +17,7 @@ model Presence {
   lng      Float
   name     String   @default("")
   gender   String   @default("")
+  location String   @default("") // e.g. "California, US" from reverse geocoding
   busy     Boolean  @default(false) // true while in an active connection
   lastSeen DateTime
 

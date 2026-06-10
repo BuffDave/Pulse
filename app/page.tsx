@@ -1,263 +1,450 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import EntryGate from "./components/EntryGate";
 import WorldMap from "./components/WorldMap";
 import ConnectionPrompt from "./components/ConnectionPrompt";
 import ChatPanel, { type ChatMessage } from "./components/ChatPanel";
+import ChatTabs from "./components/ChatTabs";
 import VideoPanel from "./components/VideoPanel";
+import BottomBar, { type GenderFilter } from "./components/BottomBar";
 import ChangelogPanel from "./components/ChangelogPanel";
 import changelogContent from "../CHANGELOG.md";
 import { join, leave, poll, sendSignal } from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
-import { type PeerDot, type SignalMsg } from "@/lib/types";
-
-type Conn =
-  | { kind: "idle" }
-  | { kind: "requesting"; peerId: string }
-  | { kind: "incoming"; peerId: string }
-  | { kind: "connecting"; peerId: string }
-  | { kind: "connected"; peerId: string };
+import { peerDisplayName } from "@/lib/peerDisplay";
+import { type Gender, type PeerDot, type SignalMsg } from "@/lib/types";
 
 type VideoState = "none" | "requesting" | "incoming" | "active";
 
+function formatPeerLabel(name: string, location: string): string {
+  const n = peerDisplayName(name);
+  return location ? `${n} from ${location}` : n;
+}
+
+interface ChatSession {
+  peerId: string;
+  peerName: string;
+  peerGender: Gender;
+  peerLocation: string;
+  conn: "connecting" | "connected";
+  peer: PeerSession;
+  messages: ChatMessage[];
+  unread: number;
+  video: VideoState;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+}
+
 const REQUEST_TIMEOUT_MS = 30_000;
+
+function cloneSessions(map: Map<string, ChatSession>) {
+  return new Map(map);
+}
 
 export default function Home() {
   const [phase, setPhase] = useState<"gate" | "live">("gate");
   const [sessionId] = useState(() => crypto.randomUUID());
   const [peers, setPeers] = useState<PeerDot[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = useState<Map<string, ChatSession>>(
+    () => new Map(),
+  );
+  const [activePeerId, setActivePeerId] = useState<string | null>(null);
+  const [incomingPeerId, setIncomingPeerId] = useState<string | null>(null);
+  const [requestingPeerId, setRequestingPeerId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [myLocation, setMyLocation] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
   const [myName, setMyName] = useState("");
-  const [myGender, setMyGender] = useState("");
-  const [chatPeerName, setChatPeerName] = useState("");
+  const [myGender, setMyGender] = useState<Gender>("other");
+  const [myLocationLabel, setMyLocationLabel] = useState("");
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
 
-  const [conn, _setConn] = useState<Conn>({ kind: "idle" });
-  const connRef = useRef<Conn>(conn);
-  const setConn = (c: Conn) => {
-    connRef.current = c;
-    _setConn(c);
-  };
-
-  const [video, _setVideo] = useState<VideoState>("none");
-  const videoRef = useRef<VideoState>(video);
-  const setVideo = (v: VideoState) => {
-    videoRef.current = v;
-    _setVideo(v);
-  };
-
-  const peerRef = useRef<PeerSession | null>(null);
+  const sessionsRef = useRef(sessions);
+  const activePeerIdRef = useRef(activePeerId);
+  const incomingPeerIdRef = useRef(incomingPeerId);
+  const requestingPeerIdRef = useRef(requestingPeerId);
+  const peersRef = useRef(peers);
   const msgId = useRef(0);
-  const requestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+
+  useEffect(() => {
+    activePeerIdRef.current = activePeerId;
+  }, [activePeerId]);
+
+  useEffect(() => {
+    incomingPeerIdRef.current = incomingPeerId;
+  }, [incomingPeerId]);
+
+  useEffect(() => {
+    requestingPeerIdRef.current = requestingPeerId;
+  }, [requestingPeerId]);
+
+  useEffect(() => {
+    peersRef.current = peers;
+  }, [peers]);
 
   function showNotice(text: string) {
     setNotice(text);
     window.setTimeout(() => setNotice(null), 3500);
   }
 
-  function addMessage(mine: boolean, text: string) {
-    setMessages((prev) => [...prev, { id: msgId.current++, mine, text }]);
+  function resolvePeer(peerId: string): {
+    name: string;
+    gender: Gender;
+    location: string;
+  } {
+    const peer = peersRef.current.find((p) => p.id === peerId);
+    return {
+      name: peer?.name.trim() ?? "",
+      gender: peer?.gender ?? "other",
+      location: peer?.location ?? "",
+    };
   }
 
-  function resolvePeerName(peerId: string): string {
-    return peers.find((p) => p.id === peerId)?.name.trim() ?? "";
-  }
-
-  function teardown(message?: string) {
-    if (requestTimer.current) clearTimeout(requestTimer.current);
-    peerRef.current?.close();
-    peerRef.current = null;
-    setLocalStream(null);
-    setRemoteStream(null);
-    setVideo("none");
-    setMessages([]);
-    setChatPeerName("");
-    setConn({ kind: "idle" });
-    if (message) showNotice(message);
-  }
-
-  function startPeer(peerId: string, initiator: boolean) {
-    const ps = new PeerSession(initiator, {
-      onSignal: (type: DescType, payload: string) => {
-        void sendSignal(sessionId, peerId, type, payload);
-      },
-      onChat: (text) => addMessage(false, text),
-      onControl: (ctrl) => handleControl(ctrl),
-      onRemoteStream: (stream) => setRemoteStream(stream),
-      onConnectionState: (state) => {
-        if (state === "failed") {
-          teardown("Connection failed (network).");
-        }
-      },
-      onChannelOpen: () => {
-        setConn({ kind: "connected", peerId });
-      },
+  function updateSession(
+    peerId: string,
+    updater: (session: ChatSession) => ChatSession,
+  ) {
+    setSessions((prev) => {
+      const session = prev.get(peerId);
+      if (!session) return prev;
+      const next = cloneSessions(prev);
+      next.set(peerId, updater(session));
+      return next;
     });
-    peerRef.current = ps;
   }
 
-  function handleControl(ctrl: PeerControl) {
-    const ps = peerRef.current;
+  function pickNextActivePeerId(
+    remaining: Map<string, ChatSession>,
+    excludePeerId: string,
+  ): string | null {
+    for (const id of remaining.keys()) {
+      if (id !== excludePeerId) return id;
+    }
+    return null;
+  }
+
+  const teardown = useCallback((peerId: string, message?: string) => {
+    const timer = requestTimers.current.get(peerId);
+    if (timer) {
+      clearTimeout(timer);
+      requestTimers.current.delete(peerId);
+    }
+
+    const session = sessionsRef.current.get(peerId);
+    session?.peer.close();
+
+    setSessions((prev) => {
+      if (!prev.has(peerId)) return prev;
+      const next = cloneSessions(prev);
+      next.delete(peerId);
+      return next;
+    });
+
+    setActivePeerId((current) => {
+      if (current !== peerId) return current;
+      const remaining = cloneSessions(sessionsRef.current);
+      remaining.delete(peerId);
+      return pickNextActivePeerId(remaining, peerId);
+    });
+
+    if (message) showNotice(message);
+  }, []);
+
+  function addMessage(peerId: string, mine: boolean, text: string) {
+    const isActive = activePeerIdRef.current === peerId;
+    setSessions((prev) => {
+      const session = prev.get(peerId);
+      if (!session) return prev;
+      const next = cloneSessions(prev);
+      next.set(peerId, {
+        ...session,
+        messages: [...session.messages, { id: msgId.current++, mine, text }],
+        unread: isActive ? session.unread : session.unread + 1,
+      });
+      return next;
+    });
+  }
+
+  function anySessionHasVideo(
+    map: Map<string, ChatSession>,
+    excludePeerId?: string,
+  ): boolean {
+    for (const [id, session] of map) {
+      if (excludePeerId && id === excludePeerId) continue;
+      if (session.video !== "none") return true;
+    }
+    return false;
+  }
+
+  function handleControl(peerId: string, ctrl: PeerControl) {
+    const session = sessionsRef.current.get(peerId);
+    if (!session) return;
+
     switch (ctrl) {
       case "video-request":
-        if (videoRef.current === "none") setVideo("incoming");
+        if (anySessionHasVideo(sessionsRef.current)) {
+          session.peer.sendControl("video-busy");
+        } else if (session.video === "none") {
+          updateSession(peerId, (s) => ({ ...s, video: "incoming" }));
+        }
         break;
       case "video-accept":
-        if (videoRef.current === "requesting" && ps) {
-          ps.startVideo()
+        if (session.video === "requesting") {
+          session.peer
+            .startVideo()
             .then((stream) => {
-              setLocalStream(stream);
-              setVideo("active");
+              updateSession(peerId, (s) => ({
+                ...s,
+                localStream: stream,
+                video: "active",
+              }));
             })
             .catch(() => {
-              setVideo("none");
-              ps.sendControl("video-end");
+              updateSession(peerId, (s) => ({ ...s, video: "none" }));
+              session.peer.sendControl("video-end");
               showNotice("Camera unavailable.");
             });
         }
         break;
       case "video-decline":
-        if (videoRef.current === "requesting") {
-          setVideo("none");
+        if (session.video === "requesting") {
+          updateSession(peerId, (s) => ({ ...s, video: "none" }));
           showNotice("Video declined.");
         }
         break;
-      case "video-end":
-        ps?.stopVideo();
-        setLocalStream(null);
-        setRemoteStream(null);
-        setVideo("none");
+      case "video-busy":
+        if (session.video === "requesting") {
+          updateSession(peerId, (s) => ({ ...s, video: "none" }));
+          showNotice(
+            `${peerDisplayName(session.peerName)} is already in another call`,
+          );
+        }
         break;
+      case "video-end":
+        session.peer.stopVideo();
+        updateSession(peerId, (s) => ({
+          ...s,
+          localStream: null,
+          remoteStream: null,
+          video: "none",
+        }));
+        break;
+    }
+  }
+
+  function startPeer(peerId: string, initiator: boolean) {
+    const { name, gender, location } = resolvePeer(peerId);
+    const ps = new PeerSession(initiator, {
+      onSignal: (type: DescType, payload: string) => {
+        void sendSignal(sessionId, peerId, type, payload);
+      },
+      onChat: (text) => addMessage(peerId, false, text),
+      onControl: (ctrl) => handleControl(peerId, ctrl),
+      onRemoteStream: (stream) => {
+        updateSession(peerId, (s) => ({ ...s, remoteStream: stream }));
+      },
+      onConnectionState: (state) => {
+        if (state === "failed") {
+          teardown(peerId, "Connection failed (network).");
+        }
+      },
+      onChannelOpen: () => {
+        updateSession(peerId, (s) => ({ ...s, conn: "connected" }));
+      },
+    });
+
+    const newSession: ChatSession = {
+      peerId,
+      peerName: name,
+      peerGender: gender,
+      peerLocation: location,
+      conn: "connecting",
+      peer: ps,
+      messages: [],
+      unread: 0,
+      video: "none",
+      localStream: null,
+      remoteStream: null,
+    };
+
+    setSessions((prev) => {
+      const next = cloneSessions(prev);
+      next.set(peerId, newSession);
+      return next;
+    });
+    setActivePeerId(peerId);
+  }
+
+  function clearRequestTimer(peerId: string) {
+    const timer = requestTimers.current.get(peerId);
+    if (timer) {
+      clearTimeout(timer);
+      requestTimers.current.delete(peerId);
     }
   }
 
   function requestConnection(peerId: string) {
-    if (connRef.current.kind !== "idle") return;
-    setChatPeerName(resolvePeerName(peerId));
-    setConn({ kind: "requesting", peerId });
+    if (sessionsRef.current.has(peerId)) return;
+    if (requestingPeerIdRef.current === peerId) return;
+    if (requestTimers.current.has(peerId)) return;
+
+    setRequestingPeerId(peerId);
     void sendSignal(sessionId, peerId, "request");
-    requestTimer.current = setTimeout(() => {
-      if (
-        connRef.current.kind === "requesting" &&
-        connRef.current.peerId === peerId
-      ) {
-        void sendSignal(sessionId, peerId, "end");
-        teardown("No answer.");
+
+    const timer = setTimeout(() => {
+      requestTimers.current.delete(peerId);
+      if (requestingPeerIdRef.current === peerId) {
+        setRequestingPeerId(null);
       }
+      void sendSignal(sessionId, peerId, "end");
+      showNotice("No answer.");
     }, REQUEST_TIMEOUT_MS);
+    requestTimers.current.set(peerId, timer);
   }
 
   function cancelRequest() {
-    if (connRef.current.kind === "requesting") {
-      void sendSignal(sessionId, connRef.current.peerId, "end");
+    const peerId = requestingPeerIdRef.current;
+    if (peerId) {
+      clearRequestTimer(peerId);
+      void sendSignal(sessionId, peerId, "end");
     }
-    teardown();
+    setRequestingPeerId(null);
   }
 
   function acceptIncoming() {
-    if (connRef.current.kind !== "incoming") return;
-    const peerId = connRef.current.peerId;
-    setChatPeerName(resolvePeerName(peerId) || chatPeerName);
+    const peerId = incomingPeerIdRef.current;
+    if (!peerId) return;
+    setIncomingPeerId(null);
     startPeer(peerId, false);
     void sendSignal(sessionId, peerId, "accept");
-    setConn({ kind: "connecting", peerId });
   }
 
   function declineIncoming() {
-    if (connRef.current.kind !== "incoming") return;
-    void sendSignal(sessionId, connRef.current.peerId, "decline");
-    setChatPeerName("");
-    setConn({ kind: "idle" });
+    const peerId = incomingPeerIdRef.current;
+    if (!peerId) return;
+    void sendSignal(sessionId, peerId, "decline");
+    setIncomingPeerId(null);
   }
 
-  function endConnection() {
-    const c = connRef.current;
-    if (c.kind === "connecting" || c.kind === "connected") {
-      void sendSignal(sessionId, c.peerId, "end");
+  function endConnection(peerId: string) {
+    const session = sessionsRef.current.get(peerId);
+    if (session) {
+      void sendSignal(sessionId, peerId, "end");
     }
-    teardown();
+    teardown(peerId);
   }
 
-  function startVideoRequest() {
-    if (videoRef.current !== "none" || !peerRef.current) return;
-    setVideo("requesting");
-    peerRef.current.sendControl("video-request");
+  function setActiveTab(peerId: string) {
+    setActivePeerId(peerId);
+    updateSession(peerId, (s) => ({ ...s, unread: 0 }));
   }
 
-  function acceptVideo() {
-    const ps = peerRef.current;
-    if (!ps) return;
-    ps.startVideo()
+  function startVideoRequest(peerId: string) {
+    const session = sessionsRef.current.get(peerId);
+    if (!session || session.video !== "none") return;
+    if (anySessionHasVideo(sessionsRef.current, peerId)) {
+      showNotice("End the other video call first.");
+      return;
+    }
+    updateSession(peerId, (s) => ({ ...s, video: "requesting" }));
+    session.peer.sendControl("video-request");
+  }
+
+  function acceptVideo(peerId: string) {
+    const session = sessionsRef.current.get(peerId);
+    if (!session) return;
+    if (anySessionHasVideo(sessionsRef.current, peerId)) {
+      session.peer.sendControl("video-decline");
+      updateSession(peerId, (s) => ({ ...s, video: "none" }));
+      showNotice("End the other video call first.");
+      return;
+    }
+    session.peer
+      .startVideo()
       .then((stream) => {
-        setLocalStream(stream);
-        ps.sendControl("video-accept");
-        setVideo("active");
+        updateSession(peerId, (s) => ({
+          ...s,
+          localStream: stream,
+          video: "active",
+        }));
+        session.peer.sendControl("video-accept");
       })
       .catch(() => {
-        ps.sendControl("video-decline");
-        setVideo("none");
+        session.peer.sendControl("video-decline");
+        updateSession(peerId, (s) => ({ ...s, video: "none" }));
         showNotice("Camera unavailable.");
       });
   }
 
-  function declineVideo() {
-    peerRef.current?.sendControl("video-decline");
-    setVideo("none");
+  function declineVideo(peerId: string) {
+    const session = sessionsRef.current.get(peerId);
+    session?.peer.sendControl("video-decline");
+    updateSession(peerId, (s) => ({ ...s, video: "none" }));
   }
 
-  function endVideo() {
-    const ps = peerRef.current;
-    ps?.stopVideo();
-    ps?.sendControl("video-end");
-    setLocalStream(null);
-    setRemoteStream(null);
-    setVideo("none");
+  function endVideo(peerId: string) {
+    const session = sessionsRef.current.get(peerId);
+    session?.peer.stopVideo();
+    session?.peer.sendControl("video-end");
+    updateSession(peerId, (s) => ({
+      ...s,
+      localStream: null,
+      remoteStream: null,
+      video: "none",
+    }));
   }
 
   function processSignal(sig: SignalMsg) {
     switch (sig.type) {
       case "request": {
-        if (connRef.current.kind === "idle") {
-          setChatPeerName(resolvePeerName(sig.fromId));
-          setConn({ kind: "incoming", peerId: sig.fromId });
-        } else {
+        if (sessionsRef.current.has(sig.fromId)) {
           void sendSignal(sessionId, sig.fromId, "decline");
+          break;
         }
+        if (incomingPeerIdRef.current === sig.fromId) {
+          break;
+        }
+        if (incomingPeerIdRef.current) {
+          void sendSignal(sessionId, sig.fromId, "decline");
+          break;
+        }
+        setIncomingPeerId(sig.fromId);
         break;
       }
       case "accept": {
-        const c = connRef.current;
-        if (c.kind === "requesting" && c.peerId === sig.fromId) {
-          if (requestTimer.current) clearTimeout(requestTimer.current);
+        if (requestingPeerIdRef.current === sig.fromId) {
+          clearRequestTimer(sig.fromId);
+          setRequestingPeerId(null);
           startPeer(sig.fromId, true);
-          setConn({ kind: "connecting", peerId: sig.fromId });
         }
         break;
       }
       case "decline": {
-        const c = connRef.current;
-        if (c.kind === "requesting" && c.peerId === sig.fromId) {
-          if (requestTimer.current) clearTimeout(requestTimer.current);
-          teardown("Request declined.");
+        if (requestingPeerIdRef.current === sig.fromId) {
+          clearRequestTimer(sig.fromId);
+          setRequestingPeerId(null);
+          showNotice("Request declined.");
         }
         break;
       }
       case "offer":
       case "answer":
       case "ice": {
-        const c = connRef.current;
-        const peerId =
-          c.kind === "connecting" || c.kind === "connected" ? c.peerId : null;
-        if (peerRef.current && peerId === sig.fromId) {
-          void peerRef.current.handleSignal(
+        const session = sessionsRef.current.get(sig.fromId);
+        if (session) {
+          void session.peer.handleSignal(
             sig.type as DescType,
             sig.payload ?? "",
           );
@@ -265,17 +452,19 @@ export default function Home() {
         break;
       }
       case "end": {
-        const c = connRef.current;
-        if (
-          (c.kind === "incoming" ||
-            c.kind === "connecting" ||
-            c.kind === "connected") &&
-          c.peerId === sig.fromId
-        ) {
-          if (c.kind === "incoming") {
-            setChatPeerName("");
-            setConn({ kind: "idle" });
-          } else teardown("Stranger disconnected.");
+        if (requestingPeerIdRef.current === sig.fromId) {
+          clearRequestTimer(sig.fromId);
+          setRequestingPeerId(null);
+        }
+        if (incomingPeerIdRef.current === sig.fromId) {
+          setIncomingPeerId(null);
+        }
+        if (sessionsRef.current.has(sig.fromId)) {
+          const session = sessionsRef.current.get(sig.fromId);
+          const name = peerDisplayName(
+            session?.peerName ?? resolvePeer(sig.fromId).name,
+          );
+          teardown(sig.fromId, `${name} disconnected.`);
         }
         break;
       }
@@ -288,16 +477,30 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const c = connRef.current;
-    if (
-      c.kind === "requesting" ||
-      c.kind === "incoming" ||
-      c.kind === "connecting" ||
-      c.kind === "connected"
-    ) {
-      const name = peers.find((p) => p.id === c.peerId)?.name.trim();
-      if (name) setChatPeerName(name);
-    }
+    setSessions((prev) => {
+      let changed = false;
+      const next = cloneSessions(prev);
+      for (const [peerId, session] of prev) {
+        const peer = peers.find((p) => p.id === peerId);
+        const name = peer?.name.trim();
+        const gender = peer?.gender ?? session.peerGender;
+        const location = peer?.location ?? session.peerLocation;
+        if (
+          (name && name !== session.peerName) ||
+          gender !== session.peerGender ||
+          location !== session.peerLocation
+        ) {
+          next.set(peerId, {
+            ...session,
+            peerName: name || session.peerName,
+            peerGender: gender,
+            peerLocation: location,
+          });
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, [peers]);
 
   useEffect(() => {
@@ -337,12 +540,14 @@ export default function Home() {
     lat: number,
     lng: number,
     name: string,
-    gender: string,
+    gender: Gender,
+    location: string,
   ) {
     setMyLocation({ lat, lng });
     setMyName(name);
     setMyGender(gender);
-    await join(sessionId, lat, lng, name, gender);
+    setMyLocationLabel(location);
+    await join(sessionId, lat, lng, name, gender, location);
     setPhase("live");
   }
 
@@ -350,16 +555,56 @@ export default function Home() {
     return <EntryGate onReady={handleReady} />;
   }
 
-  const inChat = conn.kind === "connecting" || conn.kind === "connected";
+  const activeSession = activePeerId
+    ? (sessions.get(activePeerId) ?? null)
+    : null;
+  const videoSession = [...sessions.values()].find((s) => s.video !== "none");
+
+  const filteredPeers =
+    genderFilter === "all"
+      ? peers
+      : peers.filter((p) => p.gender === genderFilter);
+
+  const chatTabs = [...sessions.values()].map((session) => ({
+    peerId: session.peerId,
+    peerName: session.peerName,
+    peerGender: session.peerGender,
+    unread: session.unread,
+    active: session.peerId === activePeerId,
+  }));
 
   return (
     <main className="fixed inset-0 overflow-hidden">
       <WorldMap
-        peers={peers}
-        me={myLocation ? { ...myLocation, name: myName, gender: myGender } : null}
+        peers={filteredPeers}
+        me={
+          myLocation ? { ...myLocation, name: myName, gender: myGender } : null
+        }
         onPeerClick={requestConnection}
-        canConnect={conn.kind === "idle"}
       />
+
+      {chatTabs.length > 0 && (
+        <div className="absolute inset-y-0 right-0 z-20 w-full max-w-md">
+          {activeSession && (
+            <ChatPanel
+              messages={activeSession.messages}
+              peerName={formatPeerLabel(
+                activeSession.peerName,
+                activeSession.peerLocation,
+              )}
+              connected={activeSession.conn === "connected"}
+              videoBusy={activeSession.video !== "none"}
+              onSend={(text) => {
+                activeSession.peer.sendChat(text);
+                addMessage(activeSession.peerId, true, text);
+              }}
+              onStartVideo={() => startVideoRequest(activeSession.peerId)}
+              onEnd={() => endConnection(activeSession.peerId)}
+            />
+          )}
+          <ChatTabs tabs={chatTabs} onSelect={setActiveTab} />
+        </div>
+      )}
 
       {notice && (
         <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
@@ -367,9 +612,12 @@ export default function Home() {
         </div>
       )}
 
-      {conn.kind === "requesting" && (
+      {requestingPeerId && (
         <div className="absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
-          <span>Requesting connection…</span>
+          <span>
+            Requesting connection with{" "}
+            {peerDisplayName(resolvePeer(requestingPeerId).name)}…
+          </span>
           <button
             onClick={cancelRequest}
             className="rounded-full bg-zinc-700 px-3 py-1 text-xs hover:bg-zinc-600"
@@ -379,9 +627,12 @@ export default function Home() {
         </div>
       )}
 
-      {conn.kind === "incoming" && (
+      {incomingPeerId && (
         <ConnectionPrompt
-          title="A stranger wants to connect"
+          title={`${formatPeerLabel(
+            resolvePeer(incomingPeerId).name,
+            resolvePeer(incomingPeerId).location,
+          )} wants to connect`}
           acceptLabel="Accept"
           declineLabel="Decline"
           onAccept={acceptIncoming}
@@ -389,47 +640,51 @@ export default function Home() {
         />
       )}
 
-      {inChat && (
-        <ChatPanel
-          messages={messages}
-          peerName={chatPeerName}
-          connected={conn.kind === "connected"}
-          videoBusy={video !== "none"}
-          onSend={(text) => {
-            peerRef.current?.sendChat(text);
-            addMessage(true, text);
-          }}
-          onStartVideo={startVideoRequest}
-          onEnd={endConnection}
-        />
-      )}
-
-      {video === "requesting" && (
-        <div className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
-          Waiting for stranger to accept video…
+      {videoSession?.video === "requesting" && (
+        <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
+          Waiting for{" "}
+          {formatPeerLabel(videoSession.peerName, videoSession.peerLocation)} to
+          accept video call…
         </div>
       )}
 
-      {video === "incoming" && (
+      {videoSession?.video === "incoming" && (
         <ConnectionPrompt
           title="Start video call?"
-          subtitle="The stranger wants to turn on video."
+          subtitle={`${formatPeerLabel(videoSession.peerName, videoSession.peerLocation)} wants to start a video call.`}
           acceptLabel="Accept"
           declineLabel="Decline"
-          onAccept={acceptVideo}
-          onDecline={declineVideo}
+          onAccept={() => acceptVideo(videoSession.peerId)}
+          onDecline={() => declineVideo(videoSession.peerId)}
         />
       )}
 
-      {video === "active" && (
+      {videoSession?.video === "active" && (
         <VideoPanel
-          localStream={localStream}
-          remoteStream={remoteStream}
-          onEnd={endVideo}
+          peerName={formatPeerLabel(
+            videoSession.peerName,
+            videoSession.peerLocation,
+          )}
+          localStream={videoSession.localStream}
+          remoteStream={videoSession.remoteStream}
+          onEnd={() => endVideo(videoSession.peerId)}
         />
       )}
 
-      <ChangelogPanel content={changelogContent} />
+      {videoSession?.video !== "active" && (
+        <BottomBar
+          onlineCount={peers.length}
+          onChangelogOpen={() => setChangelogOpen(true)}
+          genderFilter={genderFilter}
+          onGenderFilterChange={setGenderFilter}
+        />
+      )}
+
+      <ChangelogPanel
+        content={changelogContent}
+        open={changelogOpen}
+        onClose={() => setChangelogOpen(false)}
+      />
     </main>
   );
 }

@@ -18,8 +18,7 @@ const VALID_TYPES: SignalType[] = [
 const MAX_PAYLOAD = 64 * 1024; // SDP/ICE are small; cap to be safe.
 
 // POST /api/signal — body { fromId, toId, type, payload? }
-// Drops one message into the recipient's mailbox. Also manages the `busy`
-// flag so a user can only be in one connection at a time.
+// Drops one message into the recipient's mailbox.
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -50,37 +49,16 @@ export async function POST(request: NextRequest) {
   const signalType = type as SignalType;
   const payloadStr = typeof payload === "string" ? payload : null;
 
-  // Enforce "one active connection at a time": if the target is already busy,
-  // auto-decline the request instead of delivering it.
+  // If the target went offline, auto-decline connection requests.
   if (signalType === "request") {
     const target = await prisma.presence.findUnique({
       where: { id: toId },
-      select: { busy: true },
+      select: { id: true },
     });
     if (!target) {
-      // Target went offline — tell the initiator it was declined.
       await sendDecline(toId, fromId);
       return Response.json({ ok: true, autoDeclined: true });
     }
-    if (target.busy) {
-      await sendDecline(toId, fromId);
-      return Response.json({ ok: true, autoDeclined: true });
-    }
-  }
-
-  // Busy transitions:
-  // - accept: the connection is now active → mark BOTH peers busy.
-  // - decline/end: free both peers.
-  if (signalType === "accept") {
-    await prisma.presence.updateMany({
-      where: { id: { in: [fromId, toId] } },
-      data: { busy: true },
-    });
-  } else if (signalType === "decline" || signalType === "end") {
-    await prisma.presence.updateMany({
-      where: { id: { in: [fromId, toId] } },
-      data: { busy: false },
-    });
   }
 
   await prisma.signal.create({

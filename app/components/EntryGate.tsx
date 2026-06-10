@@ -1,18 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import GenderIcon from "@/app/components/GenderIcon";
+import { reverseGeocode } from "@/lib/reverseGeocode";
 import type { Gender } from "@/lib/types";
 
-const GENDER_OPTIONS: { value: Gender; label: string; emoji: string }[] = [
-  { value: "male", label: "Male", emoji: "👨" },
-  { value: "female", label: "Female", emoji: "👩" },
-  { value: "other", label: "Other", emoji: "🧑" },
+const GENDER_OPTIONS: { value: Gender; label: string }[] = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "other", label: "Other" },
 ];
 
 export default function EntryGate({
   onReady,
 }: {
-  onReady: (lat: number, lng: number, name: string, gender: Gender) => void;
+  onReady: (
+    lat: number,
+    lng: number,
+    name: string,
+    gender: Gender,
+    location: string,
+  ) => void;
 }) {
   const [name, setName] = useState("");
   const [gender, setGender] = useState<Gender | null>(null);
@@ -21,7 +29,7 @@ export default function EntryGate({
 
   const canEnter = name.trim().length > 0 && gender !== null;
 
-  function enter() {
+  async function enter() {
     if (!canEnter || !gender) return;
 
     if (!("geolocation" in navigator)) {
@@ -31,8 +39,11 @@ export default function EntryGate({
     }
     setStatus("locating");
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        onReady(pos.coords.latitude, pos.coords.longitude, name.trim(), gender),
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        const location = await reverseGeocode(lat, lng);
+        onReady(lat, lng, name.trim(), gender, location);
+      },
       (err) => {
         setStatus("error");
         setError(
@@ -83,7 +94,7 @@ export default function EntryGate({
                     : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-600"
                 }`}
               >
-                <span className="text-lg">{opt.emoji}</span>
+                <GenderIcon gender={opt.value} />
                 <span>{opt.label}</span>
               </button>
             ))}
@@ -92,7 +103,7 @@ export default function EntryGate({
       </div>
 
       <button
-        onClick={enter}
+        onClick={() => void enter()}
         disabled={!canEnter || status === "locating"}
         className="rounded-full bg-emerald-400 px-8 py-3 font-semibold text-zinc-950 transition hover:bg-emerald-300 disabled:opacity-60"
       >

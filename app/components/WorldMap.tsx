@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Map as MapboxMap, Marker } from "mapbox-gl";
-import type { PeerDot } from "@/lib/types";
+import type { Gender, PeerDot } from "@/lib/types";
+import { genderIconHtml } from "@/app/components/GenderIcon";
+import { genderColor, peerDisplayName } from "@/lib/peerDisplay";
 
 const TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
@@ -11,40 +13,6 @@ const TOKEN =
 const STYLE =
   process.env.NEXT_PUBLIC_MAPBOX_STYLE ??
   "***REMOVED***";
-
-function dotColor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  }
-  return `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
-}
-
-function genderColor(gender: string, fallbackId: string): string {
-  switch (gender) {
-    case "male":
-      return "#60a5fa";
-    case "female":
-      return "#f472b6";
-    case "other":
-      return "#a78bfa";
-    default:
-      return dotColor(fallbackId);
-  }
-}
-
-function genderEmoji(gender: string): string {
-  switch (gender) {
-    case "male":
-      return "👨";
-    case "female":
-      return "👩";
-    case "other":
-      return "🧑";
-    default:
-      return "•";
-  }
-}
 
 function escapeHtml(text: string): string {
   return text
@@ -54,21 +22,18 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function peerLabelHtml(name: string, gender: string): string {
-  const displayName = name.trim() || "Stranger";
-  return `<span class="pulse-dot-label">${genderEmoji(gender)} ${escapeHtml(displayName)}</span>`;
+function peerLabelHtml(name: string, gender: Gender): string {
+  return `<span class="pulse-dot-label">${genderIconHtml(gender)} ${escapeHtml(peerDisplayName(name))}</span>`;
 }
 
 export default function WorldMap({
   peers,
   me,
   onPeerClick,
-  canConnect,
 }: {
   peers: PeerDot[];
-  me: { lat: number; lng: number; name: string; gender: string } | null;
+  me: { lat: number; lng: number; name: string; gender: Gender } | null;
   onPeerClick: (id: string) => void;
-  canConnect: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
@@ -79,10 +44,8 @@ export default function WorldMap({
   // Marker click handlers are bound once, so read the live click handler +
   // connectability through refs (synced in an effect, never during render).
   const onPeerClickRef = useRef(onPeerClick);
-  const canConnectRef = useRef(canConnect);
   useEffect(() => {
     onPeerClickRef.current = onPeerClick;
-    canConnectRef.current = canConnect;
   });
 
   // Initialise the map once.
@@ -132,12 +95,12 @@ export default function WorldMap({
     (async () => {
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled) return;
-      const label = `${genderEmoji(me.gender)} ${escapeHtml(me.name)}`;
+      const label = peerLabelHtml(me.name, me.gender);
       if (!meMarkerRef.current) {
         const el = document.createElement("div");
         el.className = "pulse-me";
         el.title = "You are here";
-        el.innerHTML = `<span class="pulse-me-label">${label}</span>📍`;
+        el.innerHTML = `${label}📍`;
         // anchor "bottom" → the pin's tip sits on the exact coordinate.
         meMarkerRef.current = new mapboxgl.Marker({
           element: el,
@@ -149,8 +112,8 @@ export default function WorldMap({
         meMarkerRef.current.setLngLat([me.lng, me.lat]);
         const labelEl = meMarkerRef.current
           .getElement()
-          .querySelector(".pulse-me-label");
-        if (labelEl) labelEl.innerHTML = label;
+          .querySelector(".pulse-dot-label");
+        if (labelEl) labelEl.outerHTML = label;
       }
     })();
 
@@ -177,12 +140,12 @@ export default function WorldMap({
         if (!marker) {
           const el = document.createElement("button");
           el.className = "pulse-dot";
-          el.style.background = genderColor(peer.gender, peer.id);
-          el.title = `Tap to connect with ${peer.name || "stranger"}`;
+          el.style.background = genderColor(peer.gender);
+          el.title = `Tap to connect with ${peerDisplayName(peer.name)}`;
           el.innerHTML = peerLabelHtml(peer.name, peer.gender);
           el.addEventListener("click", (e) => {
             e.stopPropagation();
-            if (canConnectRef.current) onPeerClickRef.current(peer.id);
+            onPeerClickRef.current(peer.id);
           });
           marker = new mapboxgl.Marker({ element: el, anchor: "center" })
             .setLngLat([peer.lng, peer.lat])
@@ -190,8 +153,8 @@ export default function WorldMap({
           markers.set(peer.id, marker);
         } else {
           const el = marker.getElement();
-          el.style.background = genderColor(peer.gender, peer.id);
-          el.title = `Tap to connect with ${peer.name || "stranger"}`;
+          el.style.background = genderColor(peer.gender);
+          el.title = `Tap to connect with ${peerDisplayName(peer.name)}`;
           el.innerHTML = peerLabelHtml(peer.name, peer.gender);
         }
         marker.getElement().style.opacity = peer.busy ? "0.35" : "1";
@@ -225,10 +188,6 @@ export default function WorldMap({
         </div>
       )}
 
-      {/* Online count */}
-      <div className="absolute bottom-4 left-4 rounded-full bg-zinc-900/80 px-3 py-1.5 text-xs text-zinc-300 backdrop-blur">
-        {peers.length} online
-      </div>
     </div>
   );
 }

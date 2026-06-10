@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const { id, lat, lng, name, gender } = (body ?? {}) as Record<
+  const { id, lat, lng, name, gender, location } = (body ?? {}) as Record<
     string,
     unknown
   >;
@@ -35,6 +35,8 @@ export async function POST(request: NextRequest) {
   if (typeof gender !== "string" || !VALID_GENDERS.has(gender)) {
     return Response.json({ error: "invalid gender" }, { status: 400 });
   }
+  const trimmedLocation =
+    typeof location === "string" ? location.trim().slice(0, 100) : "";
 
   const offset = applyPrivacyOffset(lat as number, lng as number);
   const trimmedName = name.trim();
@@ -47,6 +49,7 @@ export async function POST(request: NextRequest) {
       lng: offset.lng,
       name: trimmedName,
       gender,
+      location: trimmedLocation,
       busy: false,
       lastSeen: new Date(),
     },
@@ -55,6 +58,7 @@ export async function POST(request: NextRequest) {
       lng: offset.lng,
       name: trimmedName,
       gender,
+      location: trimmedLocation,
       lastSeen: new Date(),
       busy: false,
     },

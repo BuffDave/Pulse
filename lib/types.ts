@@ -18,7 +18,8 @@ export interface PeerDot {
   lng: number;
   busy: boolean;
   name: string;
-  gender: string;
+  gender: Gender;
+  location: string;
 }
 
 export interface SignalMsg {
