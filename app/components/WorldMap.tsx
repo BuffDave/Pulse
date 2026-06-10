@@ -5,7 +5,12 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Map as MapboxMap, Marker } from "mapbox-gl";
 import type { PeerDot } from "@/lib/types";
 
-const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "***REMOVED***";
+const TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
+  "***REMOVED***";
+const STYLE =
+  process.env.NEXT_PUBLIC_MAPBOX_STYLE ??
+  "***REMOVED***";
 
 function dotColor(id: string): string {
   let hash = 0;
@@ -53,7 +58,7 @@ export default function WorldMap({
       mapboxgl.accessToken = TOKEN;
       const map = new mapboxgl.Map({
         container: containerRef.current,
-        style: "mapbox://styles/mapbox/dark-v11",
+        style: STYLE,
         // Open centered on the user if we know where they are, else world view.
         center: me ? [me.lng, me.lat] : [0, 20],
         zoom: me ? 4 : 1.4,
@@ -94,7 +99,10 @@ export default function WorldMap({
         el.title = "You are here";
         el.innerHTML = `<span class="pulse-me-label">Me</span>📍`;
         // anchor "bottom" → the pin's tip sits on the exact coordinate.
-        meMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+        meMarkerRef.current = new mapboxgl.Marker({
+          element: el,
+          anchor: "bottom",
+        })
           .setLngLat([me.lng, me.lat])
           .addTo(map);
       } else {
@@ -161,8 +169,8 @@ export default function WorldMap({
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
           <p className="max-w-md rounded-lg bg-zinc-800 p-4 text-sm text-zinc-200">
             Set{" "}
-            <code className="text-emerald-400">NEXT_PUBLIC_MAPBOX_TOKEN</code> in{" "}
-            <code>.env</code> to load the map.
+            <code className="text-emerald-400">NEXT_PUBLIC_MAPBOX_TOKEN</code>{" "}
+            in <code>.env</code> to load the map.
           </p>
         </div>
       )}
