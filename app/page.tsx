@@ -6,6 +6,8 @@ import WorldMap from "./components/WorldMap";
 import ConnectionPrompt from "./components/ConnectionPrompt";
 import ChatPanel, { type ChatMessage } from "./components/ChatPanel";
 import VideoPanel from "./components/VideoPanel";
+import ChangelogPanel from "./components/ChangelogPanel";
+import changelogContent from "../CHANGELOG.md";
 import { join, leave, poll, sendSignal } from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
@@ -391,6 +393,8 @@ export default function Home() {
           onEnd={endVideo}
         />
       )}
+
+      <ChangelogPanel content={changelogContent} />
     </main>
   );
 }

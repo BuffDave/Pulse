@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
       lat: offset.lat,
       lng: offset.lng,
       lastSeen: new Date(),
+      busy: false,
     },
   });
 
