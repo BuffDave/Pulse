@@ -36,6 +36,9 @@ export default function Home() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [myName, setMyName] = useState("");
+  const [myGender, setMyGender] = useState("");
+  const [chatPeerName, setChatPeerName] = useState("");
 
   const [conn, _setConn] = useState<Conn>({ kind: "idle" });
   const connRef = useRef<Conn>(conn);
@@ -64,6 +67,10 @@ export default function Home() {
     setMessages((prev) => [...prev, { id: msgId.current++, mine, text }]);
   }
 
+  function resolvePeerName(peerId: string): string {
+    return peers.find((p) => p.id === peerId)?.name.trim() ?? "";
+  }
+
   function teardown(message?: string) {
     if (requestTimer.current) clearTimeout(requestTimer.current);
     peerRef.current?.close();
@@ -72,6 +79,7 @@ export default function Home() {
     setRemoteStream(null);
     setVideo("none");
     setMessages([]);
+    setChatPeerName("");
     setConn({ kind: "idle" });
     if (message) showNotice(message);
   }
@@ -133,6 +141,7 @@ export default function Home() {
 
   function requestConnection(peerId: string) {
     if (connRef.current.kind !== "idle") return;
+    setChatPeerName(resolvePeerName(peerId));
     setConn({ kind: "requesting", peerId });
     void sendSignal(sessionId, peerId, "request");
     requestTimer.current = setTimeout(() => {
@@ -156,6 +165,7 @@ export default function Home() {
   function acceptIncoming() {
     if (connRef.current.kind !== "incoming") return;
     const peerId = connRef.current.peerId;
+    setChatPeerName(resolvePeerName(peerId) || chatPeerName);
     startPeer(peerId, false);
     void sendSignal(sessionId, peerId, "accept");
     setConn({ kind: "connecting", peerId });
@@ -164,6 +174,7 @@ export default function Home() {
   function declineIncoming() {
     if (connRef.current.kind !== "incoming") return;
     void sendSignal(sessionId, connRef.current.peerId, "decline");
+    setChatPeerName("");
     setConn({ kind: "idle" });
   }
 
@@ -215,6 +226,7 @@ export default function Home() {
     switch (sig.type) {
       case "request": {
         if (connRef.current.kind === "idle") {
+          setChatPeerName(resolvePeerName(sig.fromId));
           setConn({ kind: "incoming", peerId: sig.fromId });
         } else {
           void sendSignal(sessionId, sig.fromId, "decline");
@@ -260,8 +272,10 @@ export default function Home() {
             c.kind === "connected") &&
           c.peerId === sig.fromId
         ) {
-          if (c.kind === "incoming") setConn({ kind: "idle" });
-          else teardown("Stranger disconnected.");
+          if (c.kind === "incoming") {
+            setChatPeerName("");
+            setConn({ kind: "idle" });
+          } else teardown("Stranger disconnected.");
         }
         break;
       }
@@ -272,6 +286,19 @@ export default function Home() {
   useEffect(() => {
     processSignalRef.current = processSignal;
   });
+
+  useEffect(() => {
+    const c = connRef.current;
+    if (
+      c.kind === "requesting" ||
+      c.kind === "incoming" ||
+      c.kind === "connecting" ||
+      c.kind === "connected"
+    ) {
+      const name = peers.find((p) => p.id === c.peerId)?.name.trim();
+      if (name) setChatPeerName(name);
+    }
+  }, [peers]);
 
   useEffect(() => {
     if (phase !== "live" || !sessionId) return;
@@ -306,9 +333,16 @@ export default function Home() {
     };
   }, [sessionId, phase]);
 
-  async function handleReady(lat: number, lng: number) {
+  async function handleReady(
+    lat: number,
+    lng: number,
+    name: string,
+    gender: string,
+  ) {
     setMyLocation({ lat, lng });
-    await join(sessionId, lat, lng);
+    setMyName(name);
+    setMyGender(gender);
+    await join(sessionId, lat, lng, name, gender);
     setPhase("live");
   }
 
@@ -322,7 +356,7 @@ export default function Home() {
     <main className="fixed inset-0 overflow-hidden">
       <WorldMap
         peers={peers}
-        me={myLocation}
+        me={myLocation ? { ...myLocation, name: myName, gender: myGender } : null}
         onPeerClick={requestConnection}
         canConnect={conn.kind === "idle"}
       />
@@ -358,6 +392,7 @@ export default function Home() {
       {inChat && (
         <ChatPanel
           messages={messages}
+          peerName={chatPeerName}
           connected={conn.kind === "connected"}
           videoBusy={video !== "none"}
           onSend={(text) => {

@@ -20,6 +20,45 @@ function dotColor(id: string): string {
   return `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
 }
 
+function genderColor(gender: string, fallbackId: string): string {
+  switch (gender) {
+    case "male":
+      return "#60a5fa";
+    case "female":
+      return "#f472b6";
+    case "other":
+      return "#a78bfa";
+    default:
+      return dotColor(fallbackId);
+  }
+}
+
+function genderEmoji(gender: string): string {
+  switch (gender) {
+    case "male":
+      return "👨";
+    case "female":
+      return "👩";
+    case "other":
+      return "🧑";
+    default:
+      return "•";
+  }
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function peerLabelHtml(name: string, gender: string): string {
+  const displayName = name.trim() || "Stranger";
+  return `<span class="pulse-dot-label">${genderEmoji(gender)} ${escapeHtml(displayName)}</span>`;
+}
+
 export default function WorldMap({
   peers,
   me,
@@ -27,7 +66,7 @@ export default function WorldMap({
   canConnect,
 }: {
   peers: PeerDot[];
-  me: { lat: number; lng: number } | null;
+  me: { lat: number; lng: number; name: string; gender: string } | null;
   onPeerClick: (id: string) => void;
   canConnect: boolean;
 }) {
@@ -93,11 +132,12 @@ export default function WorldMap({
     (async () => {
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled) return;
+      const label = `${genderEmoji(me.gender)} ${escapeHtml(me.name)}`;
       if (!meMarkerRef.current) {
         const el = document.createElement("div");
         el.className = "pulse-me";
         el.title = "You are here";
-        el.innerHTML = `<span class="pulse-me-label">Me</span>📍`;
+        el.innerHTML = `<span class="pulse-me-label">${label}</span>📍`;
         // anchor "bottom" → the pin's tip sits on the exact coordinate.
         meMarkerRef.current = new mapboxgl.Marker({
           element: el,
@@ -107,6 +147,10 @@ export default function WorldMap({
           .addTo(map);
       } else {
         meMarkerRef.current.setLngLat([me.lng, me.lat]);
+        const labelEl = meMarkerRef.current
+          .getElement()
+          .querySelector(".pulse-me-label");
+        if (labelEl) labelEl.innerHTML = label;
       }
     })();
 
@@ -133,16 +177,22 @@ export default function WorldMap({
         if (!marker) {
           const el = document.createElement("button");
           el.className = "pulse-dot";
-          el.style.background = dotColor(peer.id);
-          el.title = "Tap to connect";
+          el.style.background = genderColor(peer.gender, peer.id);
+          el.title = `Tap to connect with ${peer.name || "stranger"}`;
+          el.innerHTML = peerLabelHtml(peer.name, peer.gender);
           el.addEventListener("click", (e) => {
             e.stopPropagation();
             if (canConnectRef.current) onPeerClickRef.current(peer.id);
           });
-          marker = new mapboxgl.Marker({ element: el })
+          marker = new mapboxgl.Marker({ element: el, anchor: "center" })
             .setLngLat([peer.lng, peer.lat])
             .addTo(map);
           markers.set(peer.id, marker);
+        } else {
+          const el = marker.getElement();
+          el.style.background = genderColor(peer.gender, peer.id);
+          el.title = `Tap to connect with ${peer.name || "stranger"}`;
+          el.innerHTML = peerLabelHtml(peer.name, peer.gender);
         }
         marker.getElement().style.opacity = peer.busy ? "0.35" : "1";
       }

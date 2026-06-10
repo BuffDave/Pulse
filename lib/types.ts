@@ -10,11 +10,15 @@ export type SignalType =
   | "ice" // WebRTC ICE candidate
   | "end"; // hang up / leave the connection
 
+export type Gender = "male" | "female" | "other";
+
 export interface PeerDot {
   id: string;
   lat: number;
   lng: number;
   busy: boolean;
+  name: string;
+  gender: string;
 }
 
 export interface SignalMsg {

@@ -1,16 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import type { Gender } from "@/lib/types";
+
+const GENDER_OPTIONS: { value: Gender; label: string; emoji: string }[] = [
+  { value: "male", label: "Male", emoji: "👨" },
+  { value: "female", label: "Female", emoji: "👩" },
+  { value: "other", label: "Other", emoji: "🧑" },
+];
 
 export default function EntryGate({
   onReady,
 }: {
-  onReady: (lat: number, lng: number) => void;
+  onReady: (lat: number, lng: number, name: string, gender: Gender) => void;
 }) {
+  const [name, setName] = useState("");
+  const [gender, setGender] = useState<Gender | null>(null);
   const [status, setStatus] = useState<"idle" | "locating" | "error">("idle");
   const [error, setError] = useState<string>("");
 
+  const canEnter = name.trim().length > 0 && gender !== null;
+
   function enter() {
+    if (!canEnter || !gender) return;
+
     if (!("geolocation" in navigator)) {
       setStatus("error");
       setError("Your browser doesn't support location access.");
@@ -18,7 +31,8 @@ export default function EntryGate({
     }
     setStatus("locating");
     navigator.geolocation.getCurrentPosition(
-      (pos) => onReady(pos.coords.latitude, pos.coords.longitude),
+      (pos) =>
+        onReady(pos.coords.latitude, pos.coords.longitude, name.trim(), gender),
       (err) => {
         setStatus("error");
         setError(
@@ -42,9 +56,44 @@ export default function EntryGate({
         </p>
       </div>
 
+      <div className="flex w-full max-w-sm flex-col gap-4">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm text-zinc-400">Your name</span>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={30}
+            placeholder="What should we call you?"
+            className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-400 focus:outline-none"
+          />
+        </label>
+
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="text-sm text-zinc-400">Gender</legend>
+          <div className="flex gap-2">
+            {GENDER_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setGender(opt.value)}
+                className={`flex flex-1 flex-col items-center gap-1 rounded-lg border px-3 py-2.5 text-sm transition ${
+                  gender === opt.value
+                    ? "border-emerald-400 bg-emerald-400/10 text-emerald-300"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-600"
+                }`}
+              >
+                <span className="text-lg">{opt.emoji}</span>
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      </div>
+
       <button
         onClick={enter}
-        disabled={status === "locating"}
+        disabled={!canEnter || status === "locating"}
         className="rounded-full bg-emerald-400 px-8 py-3 font-semibold text-zinc-950 transition hover:bg-emerald-300 disabled:opacity-60"
       >
         {status === "locating" ? "Locating…" : "Enter Pulse"}

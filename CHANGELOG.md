@@ -4,7 +4,16 @@ All notable changes to Pulse are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.0.0] - 2026-06-10
+## [1.1.0]
+
+### Added
+
+- **Custom Mapbox style** — Map basemap is configurable via `NEXT_PUBLIC_MAPBOX_STYLE`, with a project default style fallback.
+- **Name and gender on entry** — Users enter a display name and select a gender before joining the map.
+- **Named map markers** — Peer dots show name and gender emoji above the dot, with gender-based colors (blue / pink / purple).
+- **Peer name in chat** — The chat panel header shows the connected peer's name instead of a generic label.
+
+## [1.0.0]
 
 ### Fixed
 
