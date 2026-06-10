@@ -35,6 +35,8 @@ interface ChatSession {
   video: VideoState;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  audioMuted: boolean;
+  cameraEnabled: boolean;
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -73,6 +75,7 @@ export default function Home() {
   const requestTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
+  const videoRequestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -97,6 +100,25 @@ export default function Home() {
   function showNotice(text: string) {
     setNotice(text);
     window.setTimeout(() => setNotice(null), 3500);
+  }
+
+  function mediaErrorMessage(err: unknown): string {
+    const name =
+      err instanceof DOMException
+        ? err.name
+        : err instanceof Error
+          ? err.name
+          : "";
+    if (name === "NotAllowedError") return "Camera permission denied.";
+    if (name === "NotFoundError") return "No camera found.";
+    return "Camera unavailable.";
+  }
+
+  function clearVideoRequestTimer() {
+    if (videoRequestTimer.current) {
+      clearTimeout(videoRequestTimer.current);
+      videoRequestTimer.current = null;
+    }
   }
 
   function resolvePeer(peerId: string): {
@@ -140,6 +162,9 @@ export default function Home() {
     if (timer) {
       clearTimeout(timer);
       requestTimers.current.delete(peerId);
+    }
+    if (sessionsRef.current.get(peerId)?.video === "requesting") {
+      clearVideoRequestTimer();
     }
 
     const session = sessionsRef.current.get(peerId);
@@ -264,30 +289,29 @@ export default function Home() {
         break;
       case "video-accept":
         if (session.video === "requesting") {
+          clearVideoRequestTimer();
           session.peer
             .startVideo()
             .then((stream) => {
-              updateSession(peerId, (s) => ({
-                ...s,
-                localStream: stream,
-                video: "active",
-              }));
+              activateVideoSession(peerId, stream);
             })
-            .catch(() => {
+            .catch((err: unknown) => {
               updateSession(peerId, (s) => ({ ...s, video: "none" }));
               session.peer.sendControl("video-end");
-              showNotice("Camera unavailable.");
+              showNotice(mediaErrorMessage(err));
             });
         }
         break;
       case "video-decline":
         if (session.video === "requesting") {
+          clearVideoRequestTimer();
           updateSession(peerId, (s) => ({ ...s, video: "none" }));
           showNotice("Video declined.");
         }
         break;
       case "video-busy":
         if (session.video === "requesting") {
+          clearVideoRequestTimer();
           updateSession(peerId, (s) => ({ ...s, video: "none" }));
           showNotice(
             `${peerDisplayName(session.peerName)} is already in another call`,
@@ -295,12 +319,15 @@ export default function Home() {
         }
         break;
       case "video-end":
+        clearVideoRequestTimer();
         session.peer.stopVideo();
         updateSession(peerId, (s) => ({
           ...s,
           localStream: null,
           remoteStream: null,
           video: "none",
+          audioMuted: false,
+          cameraEnabled: true,
         }));
         break;
     }
@@ -342,6 +369,8 @@ export default function Home() {
       video: "none",
       localStream: null,
       remoteStream: null,
+      audioMuted: false,
+      cameraEnabled: true,
     };
 
     setSessions((prev) => {
@@ -416,6 +445,18 @@ export default function Home() {
     updateSession(peerId, (s) => ({ ...s, unread: 0 }));
   }
 
+  function activateVideoSession(peerId: string, stream: MediaStream) {
+    const session = sessionsRef.current.get(peerId);
+    session?.peer.setCameraEnabled(false);
+    updateSession(peerId, (s) => ({
+      ...s,
+      localStream: stream,
+      video: "active",
+      audioMuted: false,
+      cameraEnabled: false,
+    }));
+  }
+
   function startVideoRequest(peerId: string) {
     const session = sessionsRef.current.get(peerId);
     if (!session || session.video !== "none") return;
@@ -423,8 +464,24 @@ export default function Home() {
       showNotice("End the other video call first.");
       return;
     }
+    clearVideoRequestTimer();
     updateSession(peerId, (s) => ({ ...s, video: "requesting" }));
     session.peer.sendControl("video-request");
+    videoRequestTimer.current = setTimeout(() => {
+      videoRequestTimer.current = null;
+      if (sessionsRef.current.get(peerId)?.video === "requesting") {
+        cancelVideoRequest(peerId);
+        showNotice("No answer.");
+      }
+    }, REQUEST_TIMEOUT_MS);
+  }
+
+  function cancelVideoRequest(peerId: string) {
+    clearVideoRequestTimer();
+    const session = sessionsRef.current.get(peerId);
+    if (!session || session.video !== "requesting") return;
+    session.peer.sendControl("video-end");
+    updateSession(peerId, (s) => ({ ...s, video: "none" }));
   }
 
   function acceptVideo(peerId: string) {
@@ -439,27 +496,25 @@ export default function Home() {
     session.peer
       .startVideo()
       .then((stream) => {
-        updateSession(peerId, (s) => ({
-          ...s,
-          localStream: stream,
-          video: "active",
-        }));
+        activateVideoSession(peerId, stream);
         session.peer.sendControl("video-accept");
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         session.peer.sendControl("video-decline");
         updateSession(peerId, (s) => ({ ...s, video: "none" }));
-        showNotice("Camera unavailable.");
+        showNotice(mediaErrorMessage(err));
       });
   }
 
   function declineVideo(peerId: string) {
+    clearVideoRequestTimer();
     const session = sessionsRef.current.get(peerId);
     session?.peer.sendControl("video-decline");
     updateSession(peerId, (s) => ({ ...s, video: "none" }));
   }
 
   function endVideo(peerId: string) {
+    clearVideoRequestTimer();
     const session = sessionsRef.current.get(peerId);
     session?.peer.stopVideo();
     session?.peer.sendControl("video-end");
@@ -468,7 +523,25 @@ export default function Home() {
       localStream: null,
       remoteStream: null,
       video: "none",
+      audioMuted: false,
+      cameraEnabled: true,
     }));
+  }
+
+  function toggleVideoMute(peerId: string) {
+    const session = sessionsRef.current.get(peerId);
+    if (!session) return;
+    const nextMuted = !session.audioMuted;
+    session.peer.setAudioMuted(nextMuted);
+    updateSession(peerId, (s) => ({ ...s, audioMuted: nextMuted }));
+  }
+
+  function toggleVideoCamera(peerId: string) {
+    const session = sessionsRef.current.get(peerId);
+    if (!session) return;
+    const nextEnabled = !session.cameraEnabled;
+    session.peer.setCameraEnabled(nextEnabled);
+    updateSession(peerId, (s) => ({ ...s, cameraEnabled: nextEnabled }));
   }
 
   function processSignal(sig: SignalMsg) {
@@ -719,10 +792,18 @@ export default function Home() {
       )}
 
       {videoSession?.video === "requesting" && (
-        <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
-          Waiting for{" "}
-          {formatPeerLabel(videoSession.peerName, videoSession.peerLocation)} to
-          accept video call…
+        <div className="absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
+          <span>
+            Waiting for{" "}
+            {formatPeerLabel(videoSession.peerName, videoSession.peerLocation)}{" "}
+            to accept video call…
+          </span>
+          <button
+            onClick={() => cancelVideoRequest(videoSession.peerId)}
+            className="rounded-full bg-zinc-700 px-3 py-1 text-xs hover:bg-zinc-600"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
@@ -745,6 +826,29 @@ export default function Home() {
           )}
           localStream={videoSession.localStream}
           remoteStream={videoSession.remoteStream}
+          audioMuted={videoSession.audioMuted}
+          cameraEnabled={videoSession.cameraEnabled}
+          messages={videoSession.messages}
+          connected={videoSession.conn === "connected"}
+          onSend={(text) => {
+            const nonce = crypto.randomUUID();
+            videoSession.peer.sendChat(text, nonce);
+            addMessage(videoSession.peerId, true, text, nonce);
+          }}
+          onReact={(nonce, emoji) => {
+            const hasMine = videoSession.messages
+              .find((m) => m.nonce === nonce)
+              ?.reactions.some((r) => r.mine && r.emoji === emoji);
+            if (hasMine) {
+              videoSession.peer.sendUnreaction(nonce, emoji);
+              removeReaction(videoSession.peerId, nonce, emoji, true);
+            } else {
+              videoSession.peer.sendReaction(nonce, emoji);
+              addReaction(videoSession.peerId, nonce, emoji, true);
+            }
+          }}
+          onToggleMute={() => toggleVideoMute(videoSession.peerId)}
+          onToggleCamera={() => toggleVideoCamera(videoSession.peerId)}
           onEnd={() => endVideo(videoSession.peerId)}
         />
       )}

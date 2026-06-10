@@ -182,6 +182,18 @@ export class PeerSession {
     return this.localStream;
   }
 
+  setAudioMuted(muted: boolean) {
+    this.localStream?.getAudioTracks().forEach((t) => {
+      t.enabled = !muted;
+    });
+  }
+
+  setCameraEnabled(enabled: boolean) {
+    this.localStream?.getVideoTracks().forEach((t) => {
+      t.enabled = enabled;
+    });
+  }
+
   stopVideo() {
     if (this.localStream) {
       for (const track of this.localStream.getTracks()) track.stop();

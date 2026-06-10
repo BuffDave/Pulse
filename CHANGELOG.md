@@ -2,7 +2,26 @@
 
 All notable changes to Pulse are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+## [1.3.0]
+
+### Added
+
+- **Video call controls**: Mute, camera toggle, and end-call buttons in the video panel; local PiP shows muted and camera-off badges.
+- **Video call chat**: Full-screen two-column layout — video on the left, embedded chat on the right — reusing the same session messages as the sidebar.
+- **Video request timeout**: Outgoing video requests time out after 30s with a cancel button, matching connection requests.
+- **Camera off by default**: Joining a video call starts with the camera disabled; mic stays on. Users enable video with the camera toggle.
+
+### Changed
+
+- **Video panel layout**: Centered content up to 1340px wide with inner padding, rounded video frame, and orientation-aware stacking (portrait vs landscape).
+- **Video framing**: Remote video uses `object-contain` so feeds are not cropped; aspect ratio adapts to device orientation.
+- **Embedded chat width**: In-call chat matches the standalone panel width (`max-w-md`).
+- **Media errors**: `getUserMedia` failures distinguish permission denied, no camera, and generic errors.
+
+### Fixed
+
+- **Reaction picker on own messages**: Quick-reaction bar aligns to the right edge of your bubbles instead of using a fixed width offset.
+- **Video track toggles**: Mic and camera can be muted/disabled without SDP renegotiation via `track.enabled`.
 
 ## [1.2.0]
 

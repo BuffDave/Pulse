@@ -7,7 +7,14 @@ import { EmojiStyle, Theme } from "emoji-picker-react";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
-const REACTION_EMOJIS = ["1f44d", "2764-fe0f", "1f602", "1f62e", "1f622", "1f621"];
+const REACTION_EMOJIS = [
+  "1f44d",
+  "2764-fe0f",
+  "1f602",
+  "1f62e",
+  "1f622",
+  "1f621",
+];
 
 const PICKER_PROPS = {
   theme: Theme.DARK,
@@ -50,6 +57,7 @@ export default function ChatPanel({
   peerName,
   connected,
   videoBusy,
+  embedded = false,
   onSend,
   onReact,
   onStartVideo,
@@ -59,6 +67,7 @@ export default function ChatPanel({
   peerName: string;
   connected: boolean;
   videoBusy: boolean;
+  embedded?: boolean;
   onSend: (text: string) => void;
   onReact: (nonce: string, emoji: string) => void;
   onStartVideo: () => void;
@@ -107,7 +116,9 @@ export default function ChatPanel({
     function onScroll() {
       setReactionAnchor(null);
     }
-    messagesRef.current?.addEventListener("scroll", onScroll, { passive: true });
+    messagesRef.current?.addEventListener("scroll", onScroll, {
+      passive: true,
+    });
     return () => {
       messagesRef.current?.removeEventListener("scroll", onScroll);
     };
@@ -151,11 +162,7 @@ export default function ChatPanel({
     reactionLeaveTimer.current = setTimeout(() => setReactionAnchor(null), 250);
   }
 
-  function openReactionPicker(
-    nonce: string,
-    mine: boolean,
-    el: HTMLElement,
-  ) {
+  function openReactionPicker(nonce: string, mine: boolean, el: HTMLElement) {
     if (!connected) return;
     cancelReactionClose();
     setReactionAnchor({ nonce, rect: el.getBoundingClientRect(), mine });
@@ -165,30 +172,38 @@ export default function ChatPanel({
     reactionAnchor !== null && reactionAnchor.rect.top > 56;
 
   return (
-    <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl">
-      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-        <div>
-          <p className="font-semibold">{peerName}</p>
-          <p className="text-xs text-zinc-500">
-            {connected ? "Connected" : "Connecting…"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onStartVideo}
-            disabled={!connected || videoBusy}
-            className="rounded-full border border-zinc-700 px-3 py-1.5 text-sm hover:border-zinc-500 disabled:opacity-40"
-          >
-            Video call
-          </button>
-          <button
-            onClick={onEnd}
-            className="rounded-full bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-400"
-          >
-            End
-          </button>
-        </div>
-      </header>
+    <div
+      className={
+        embedded
+          ? "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-100 portrait:max-w-none landscape:max-w-md landscape:shrink-0"
+          : "absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl"
+      }
+    >
+      {!embedded && (
+        <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+          <div>
+            <p className="font-semibold">{peerName}</p>
+            <p className="text-xs text-zinc-500">
+              {connected ? "Connected" : "Connecting…"}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onStartVideo}
+              disabled={!connected || videoBusy}
+              className="rounded-full border border-zinc-700 px-3 py-1.5 text-sm hover:border-zinc-500 disabled:opacity-40"
+            >
+              Video call
+            </button>
+            <button
+              onClick={onEnd}
+              className="rounded-full bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-400"
+            >
+              End
+            </button>
+          </div>
+        </header>
+      )}
 
       <div ref={messagesRef} className="flex-1 space-y-2 overflow-y-auto p-4">
         {messages.length === 0 && (
@@ -268,12 +283,14 @@ export default function ChatPanel({
           onMouseEnter={cancelReactionClose}
           onMouseLeave={scheduleReactionClose}
           style={{
-            left: reactionAnchor.mine
-              ? Math.max(8, reactionAnchor.rect.right - 300)
-              : Math.min(
-                  window.innerWidth - 308,
-                  Math.max(8, reactionAnchor.rect.left),
-                ),
+            ...(reactionAnchor.mine
+              ? { right: window.innerWidth - reactionAnchor.rect.right }
+              : {
+                  left: Math.min(
+                    window.innerWidth - 308,
+                    Math.max(8, reactionAnchor.rect.left),
+                  ),
+                }),
             ...(showReactionAbove
               ? {
                   top: reactionAnchor.rect.top - 4,
