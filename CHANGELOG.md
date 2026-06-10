@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - **Emoji picker scrollbar**: Dark scrollbar styling on the picker body to match the changelog panel.
+- **Modal backdrop vs bottom bar**: Connection prompts now sit above the bottom bar (`z-40`); the bottom bar is hidden while the changelog is open so overlays cover the full screen.
 
 ## [1.1.0]
 

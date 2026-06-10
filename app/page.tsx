@@ -749,7 +749,7 @@ export default function Home() {
         />
       )}
 
-      {videoSession?.video !== "active" && (
+      {videoSession?.video !== "active" && !changelogOpen && (
         <BottomBar
           onlineCount={peers.length}
           onChangelogOpen={() => setChangelogOpen(true)}
