@@ -7,12 +7,8 @@ import type { Gender, PeerDot } from "@/lib/types";
 import { genderIconHtml } from "@/app/components/GenderIcon";
 import { genderColor, peerDisplayName } from "@/lib/peerDisplay";
 
-const TOKEN =
-  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
-  "***REMOVED***";
-const STYLE =
-  process.env.NEXT_PUBLIC_MAPBOX_STYLE ??
-  "***REMOVED***";
+const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+const STYLE = process.env.NEXT_PUBLIC_MAPBOX_STYLE;
 
 function escapeHtml(text: string): string {
   return text
@@ -24,6 +20,10 @@ function escapeHtml(text: string): string {
 
 function peerLabelHtml(name: string, gender: Gender): string {
   return `<span class="pulse-dot-label">${genderIconHtml(gender)} ${escapeHtml(peerDisplayName(name))}</span>`;
+}
+
+function mePinHtml(): string {
+  return `<span class="pulse-me-pin" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z" fill="currentColor" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/><circle cx="12" cy="10" r="2.5" fill="var(--bg-base)"/></svg></span>`;
 }
 
 export default function WorldMap({
@@ -50,7 +50,7 @@ export default function WorldMap({
 
   // Initialise the map once.
   useEffect(() => {
-    if (!TOKEN || !containerRef.current) return;
+    if (!TOKEN || !STYLE || !containerRef.current) return;
     let cancelled = false;
     const markers = markersRef.current;
 
@@ -95,12 +95,12 @@ export default function WorldMap({
     (async () => {
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled) return;
-      const label = peerLabelHtml(me.name, me.gender);
+      const label = peerLabelHtml("Me", me.gender);
       if (!meMarkerRef.current) {
         const el = document.createElement("div");
         el.className = "pulse-me";
         el.title = "You are here";
-        el.innerHTML = `${label}📍`;
+        el.innerHTML = `${label}${mePinHtml()}`;
         // anchor "bottom" → the pin's tip sits on the exact coordinate.
         meMarkerRef.current = new mapboxgl.Marker({
           element: el,
@@ -140,7 +140,7 @@ export default function WorldMap({
         if (!marker) {
           const el = document.createElement("button");
           el.className = "pulse-dot";
-          el.style.background = genderColor(peer.gender);
+          el.style.color = genderColor(peer.gender);
           el.title = `Tap to connect with ${peerDisplayName(peer.name)}`;
           el.innerHTML = peerLabelHtml(peer.name, peer.gender);
           el.addEventListener("click", (e) => {
@@ -153,7 +153,7 @@ export default function WorldMap({
           markers.set(peer.id, marker);
         } else {
           const el = marker.getElement();
-          el.style.background = genderColor(peer.gender);
+          el.style.color = genderColor(peer.gender);
           el.title = `Tap to connect with ${peerDisplayName(peer.name)}`;
           el.innerHTML = peerLabelHtml(peer.name, peer.gender);
         }
@@ -178,16 +178,25 @@ export default function WorldMap({
     <div className="absolute inset-0">
       <div ref={containerRef} className="h-full w-full bg-zinc-900" />
 
-      {!TOKEN && (
+      {(!TOKEN || !STYLE) && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
           <p className="max-w-md rounded-lg bg-zinc-800 p-4 text-sm text-zinc-200">
             Set{" "}
-            <code className="text-emerald-400">NEXT_PUBLIC_MAPBOX_TOKEN</code>{" "}
+            {!TOKEN && (
+              <>
+                <code className="text-emerald-400">
+                  NEXT_PUBLIC_MAPBOX_TOKEN
+                </code>
+                {!STYLE ? " and " : " "}
+              </>
+            )}
+            {!STYLE && (
+              <code className="text-emerald-400">NEXT_PUBLIC_MAPBOX_STYLE</code>
+            )}{" "}
             in <code>.env</code> to load the map.
           </p>
         </div>
       )}
-
     </div>
   );
 }

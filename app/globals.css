@@ -1,28 +1,228 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-base: #09090f;
+  --bg-surface: #111118;
+  --bg-elevated: #1a1a24;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-default: rgba(255, 255, 255, 0.11);
+  --accent: #34d399;
+  --accent-glow: rgba(52, 211, 153, 0.18);
+  --text-primary: #eeeef5;
+  --text-secondary: #8888a0;
+  --text-muted: #44445a;
+  --background: var(--bg-base);
+  --foreground: var(--text-primary);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Glass panel utility */
+.panel-glass {
+  background: rgba(9, 9, 15, 0.85);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+/* Entry gate aurora background */
+.entry-aurora {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.entry-aurora::before,
+.entry-aurora::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.entry-aurora::before {
+  width: 60vw;
+  height: 60vw;
+  max-width: 480px;
+  max-height: 480px;
+  top: -10%;
+  left: -10%;
+  background: radial-gradient(
+    circle,
+    rgba(52, 211, 153, 0.4) 0%,
+    transparent 70%
+  );
+  animation: aurora-drift-1 18s ease-in-out infinite alternate;
+}
+
+.entry-aurora::after {
+  width: 50vw;
+  height: 50vw;
+  max-width: 400px;
+  max-height: 400px;
+  bottom: -5%;
+  right: -10%;
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.35) 0%,
+    transparent 70%
+  );
+  animation: aurora-drift-2 22s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift-1 {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(8%, 12%) scale(1.08);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes aurora-drift-2 {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(-10%, -8%) scale(1.1);
+  }
+}
+
+/* Logo glow */
+.pulse-logo {
+  text-shadow: 0 0 40px var(--accent-glow);
+}
+
+.pulse-logo-dot {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 20px var(--accent-glow);
+  }
+  50% {
+    opacity: 0.85;
+    text-shadow: 0 0 48px rgba(52, 211, 153, 0.35);
+  }
+}
+
+/* CTA shimmer */
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shimmer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 60%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.btn-shimmer:hover:not(:disabled)::before {
+  transform: translateX(100%);
+}
+
+/* Entrance animations */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.35s ease-out both;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out both;
+}
+
+.animate-slide-right {
+  animation: slide-right 0.35s ease-out both;
+}
+
+.animate-fade-up-delay-1 {
+  animation: fade-up 0.35s ease-out 0.1s both;
+}
+
+.animate-fade-up-delay-2 {
+  animation: fade-up 0.35s ease-out 0.2s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-scale-in,
+  .animate-slide-right,
+  .animate-fade-up-delay-1,
+  .animate-fade-up-delay-2,
+  .pulse-logo-dot,
+  .pulse-dot,
+  .pulse-dot::after {
+    animation: none !important;
+  }
+
+  .entry-aurora::before,
+  .entry-aurora::after {
+    animation: none !important;
+  }
+
+  .btn-shimmer::before {
+    display: none;
+  }
 }
 
 /* Live user dots on the map */
@@ -34,9 +234,21 @@ body {
   border: 2px solid rgba(255, 255, 255, 0.9);
   cursor: pointer;
   padding: 0;
-  box-shadow: 0 0 0 rgba(255, 255, 255, 0.5);
+  background: currentColor;
+  box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 40%, transparent);
   animation: pulse-ring 2s ease-out infinite;
-  transition: transform 0.1s ease;
+  transition: transform 0.15s ease;
+}
+
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid currentColor;
+  opacity: 0;
+  pointer-events: none;
+  animation: pulse-ring-outline 2s ease-out infinite;
 }
 
 .pulse-dot:hover {
@@ -48,18 +260,52 @@ body {
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #ffffff;
-  background: rgba(0, 0, 0, 0.65);
-  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: rgba(9, 9, 15, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
   border-radius: 9999px;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* Peer labels: show name + gender only on hover/focus */
+.pulse-dot > .pulse-dot-label {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease,
+    transform 0.2s ease;
+  transform: translateX(-50%) translateY(4px);
+}
+
+.pulse-dot:hover > .pulse-dot-label,
+.pulse-dot:focus-visible > .pulse-dot-label,
+.pulse-me:hover > .pulse-dot-label,
+.pulse-me:focus-within > .pulse-dot-label {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* My marker: label hidden until hover (same as peers) */
+.pulse-me > .pulse-dot-label {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease,
+    transform 0.2s ease;
+  transform: translateX(-50%) translateY(4px);
 }
 
 .pulse-gender-icon {
@@ -69,69 +315,72 @@ body {
   vertical-align: middle;
 }
 
-/* The user's own "you are here" pin — small, sized like the dots. */
 .pulse-me {
   position: relative;
-  font-size: 18px;
-  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   cursor: default;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.65));
 }
 
-.changelog-content {
-  scrollbar-width: thin;
-  scrollbar-color: #3f3f46 #09090b;
+.pulse-me-pin {
+  display: block;
+  color: #ef4444;
+  line-height: 0;
 }
 
-.changelog-content::-webkit-scrollbar {
-  width: 10px;
-}
-
-.changelog-content::-webkit-scrollbar-track {
-  background: #09090b;
-}
-
-.changelog-content::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 9999px;
-  border: 2px solid #09090b;
-}
-
-.changelog-content::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
-}
-
+.changelog-content,
 .epr-body {
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 #09090b;
+  scrollbar-color: #2a2a38 var(--bg-base);
 }
 
+.changelog-content::-webkit-scrollbar,
 .epr-body::-webkit-scrollbar {
   width: 10px;
 }
 
+.changelog-content::-webkit-scrollbar-track,
 .epr-body::-webkit-scrollbar-track {
-  background: #09090b;
+  background: var(--bg-base);
 }
 
+.changelog-content::-webkit-scrollbar-thumb,
 .epr-body::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: #2a2a38;
   border-radius: 9999px;
-  border: 2px solid #09090b;
+  border: 2px solid var(--bg-base);
 }
 
+.changelog-content::-webkit-scrollbar-thumb:hover,
 .epr-body::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: #3a3a4a;
 }
 
 @keyframes pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0);
+    box-shadow: 0 0 0 10px color-mix(in srgb, currentColor 0%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
+  }
+}
+
+@keyframes pulse-ring-outline {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
   }
 }

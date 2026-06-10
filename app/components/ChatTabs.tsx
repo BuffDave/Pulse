@@ -22,7 +22,7 @@ export default function ChatTabs({
 
   return (
     <div className="absolute left-0 top-3 z-10 flex max-w-[12rem] -translate-x-full flex-col gap-2 pr-2">
-      {tabs.map((tab) => {
+      {tabs.map((tab, index) => {
         const displayName = peerDisplayName(tab.peerName);
         const color = genderColor(tab.peerGender);
 
@@ -31,10 +31,11 @@ export default function ChatTabs({
             key={tab.peerId}
             type="button"
             onClick={() => onSelect(tab.peerId)}
-            className={`flex min-w-0 items-center gap-2 rounded-full border px-3 py-1.5 text-left text-sm text-zinc-100 shadow-lg backdrop-blur ${
+            style={{ animationDelay: `${index * 0.05}s` }}
+            className={`animate-fade-up flex min-w-0 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-left text-sm text-[var(--text-primary)] shadow-lg backdrop-blur transition duration-200 ${
               tab.active
-                ? "border-emerald-400/60 bg-zinc-900/95"
-                : "border-zinc-700/80 bg-zinc-900/80"
+                ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
+                : "panel-glass border-white/[0.09] hover:border-white/15"
             }`}
           >
             <span

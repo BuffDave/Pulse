@@ -12,6 +12,7 @@
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "emoji-picker-react": "^4.19.1",
+    "lucide-react": "^1.17.0",
     "mapbox-gl": "^3.24.0",
     "next": "16.2.7",
     "pg": "^8.21.0",
@@ -31,6 +32,7 @@
     "prisma": "^7.8.0",
     "raw-loader": "^4.0.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "uipro-cli": "^2.2.3"
   }
 }

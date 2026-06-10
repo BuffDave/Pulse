@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown, ScrollText } from "lucide-react";
 import GenderIcon from "@/app/components/GenderIcon";
 import type { Gender } from "@/lib/types";
 
@@ -51,7 +52,7 @@ export default function BottomBar({
       <div ref={barRef} className="pointer-events-auto relative">
         {dropdownOpen && (
           <div
-            className="absolute bottom-full right-0 z-50 mb-2 min-w-[9rem] overflow-hidden rounded-xl border border-zinc-700/80 bg-zinc-900/95 py-1 shadow-xl backdrop-blur"
+            className="panel-glass animate-fade-up absolute bottom-full right-0 z-50 mb-2 min-w-[9rem] overflow-hidden rounded-xl py-1 shadow-xl"
             role="listbox"
           >
             {FILTER_OPTIONS.map((opt) => (
@@ -64,10 +65,10 @@ export default function BottomBar({
                   onGenderFilterChange(opt.value);
                   setDropdownOpen(false);
                 }}
-                className={`w-full px-3 py-2 text-left text-xs transition ${
+                className={`w-full cursor-pointer px-3 py-2 text-left text-xs transition duration-200 ${
                   genderFilter === opt.value
-                    ? "bg-emerald-400/10 text-emerald-300"
-                    : "text-zinc-300 hover:bg-zinc-800/80"
+                    ? "bg-[var(--accent-glow)] text-[var(--accent)]"
+                    : "text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]"
                 }`}
               >
                 {opt.label}
@@ -76,26 +77,33 @@ export default function BottomBar({
           </div>
         )}
 
-        <div className="grid w-[min(100vw-2rem,22rem)] grid-cols-3 items-stretch overflow-hidden rounded-full border border-zinc-700/80 bg-zinc-900/90 shadow-xl backdrop-blur">
+        <div className="panel-glass grid w-[min(100vw-2rem,22rem)] grid-cols-3 items-stretch overflow-hidden rounded-full shadow-xl">
           <button
             type="button"
             onClick={onChangelogOpen}
-            className="flex items-center justify-center px-2 py-2.5 text-xs text-zinc-400 transition hover:bg-zinc-800/60 hover:text-zinc-200"
+            className="flex cursor-pointer items-center justify-center gap-1.5 px-2 py-2.5 text-xs text-[var(--text-secondary)] transition duration-200 hover:bg-white/5 hover:text-[var(--text-primary)]"
           >
-            Changelog
+            <ScrollText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>Changelog</span>
           </button>
 
-          <div className="flex items-center justify-center border-x border-zinc-700/60 px-2 py-2">
-            <span className="text-lg font-bold text-emerald-400">
+          <div className="flex items-center justify-center border-x border-[var(--border-subtle)] px-2 py-2">
+            <span
+              className="mr-1.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-[var(--accent)]"
+              aria-hidden
+            />
+            <span className="text-lg font-bold text-[var(--accent)]">
               {onlineCount}
             </span>
-            <span className="ml-1.5 text-xs text-zinc-400">online</span>
+            <span className="ml-1.5 text-xs text-[var(--text-secondary)]">
+              online
+            </span>
           </div>
 
           <button
             type="button"
             onClick={() => setDropdownOpen((open) => !open)}
-            className="flex items-center justify-center gap-1 px-2 py-2.5 text-xs text-zinc-400 transition hover:bg-zinc-800/60 hover:text-zinc-200"
+            className="flex cursor-pointer items-center justify-center gap-1 px-2 py-2.5 text-xs text-[var(--text-secondary)] transition duration-200 hover:bg-white/5 hover:text-[var(--text-primary)]"
             aria-expanded={dropdownOpen}
             aria-haspopup="listbox"
           >
@@ -103,7 +111,10 @@ export default function BottomBar({
               <GenderIcon gender={genderFilter} size="sm" />
             )}
             <span className="truncate">{filterLabel(genderFilter)}</span>
-            <span className="shrink-0 text-[10px] text-zinc-500">▾</span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 transition duration-200 ${dropdownOpen ? "rotate-180" : ""}`}
+              aria-hidden
+            />
           </button>
         </div>
       </div>

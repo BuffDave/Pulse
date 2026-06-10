@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Info, Loader2, UserPlus, Video } from "lucide-react";
 import EntryGate from "./components/EntryGate";
 import WorldMap from "./components/WorldMap";
 import ConnectionPrompt from "./components/ConnectionPrompt";
@@ -758,20 +759,25 @@ export default function Home() {
       )}
 
       {notice && (
-        <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
+        <div className="panel-glass animate-fade-up absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 text-sm text-[var(--text-primary)] shadow-xl">
+          <Info className="h-4 w-4 shrink-0 text-[var(--accent)]" aria-hidden />
           {notice}
         </div>
       )}
 
       {requestingPeerId && (
-        <div className="absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
+        <div className="panel-glass animate-fade-up absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full px-4 py-2.5 text-sm text-[var(--text-primary)] shadow-xl">
+          <UserPlus
+            className="h-4 w-4 shrink-0 text-[var(--accent)]"
+            aria-hidden
+          />
           <span>
             Requesting connection with{" "}
             {peerDisplayName(resolvePeer(requestingPeerId).name)}…
           </span>
           <button
             onClick={cancelRequest}
-            className="rounded-full bg-zinc-700 px-3 py-1 text-xs hover:bg-zinc-600"
+            className="cursor-pointer rounded-full bg-white/10 px-3 py-1 text-xs transition duration-200 hover:bg-white/15"
           >
             Cancel
           </button>
@@ -792,7 +798,11 @@ export default function Home() {
       )}
 
       {videoSession?.video === "requesting" && (
-        <div className="absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
+        <div className="panel-glass animate-fade-up absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full px-4 py-2.5 text-sm text-[var(--text-primary)] shadow-xl">
+          <Loader2
+            className="h-4 w-4 shrink-0 animate-spin text-[var(--accent)]"
+            aria-hidden
+          />
           <span>
             Waiting for{" "}
             {formatPeerLabel(videoSession.peerName, videoSession.peerLocation)}{" "}
@@ -800,7 +810,7 @@ export default function Home() {
           </span>
           <button
             onClick={() => cancelVideoRequest(videoSession.peerId)}
-            className="rounded-full bg-zinc-700 px-3 py-1 text-xs hover:bg-zinc-600"
+            className="cursor-pointer rounded-full bg-white/10 px-3 py-1 text-xs transition duration-200 hover:bg-white/15"
           >
             Cancel
           </button>
@@ -813,6 +823,7 @@ export default function Home() {
           subtitle={`${formatPeerLabel(videoSession.peerName, videoSession.peerLocation)} wants to start a video call.`}
           acceptLabel="Accept"
           declineLabel="Decline"
+          icon={Video}
           onAccept={() => acceptVideo(videoSession.peerId)}
           onDecline={() => declineVideo(videoSession.peerId)}
         />

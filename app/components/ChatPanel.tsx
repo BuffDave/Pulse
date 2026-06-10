@@ -2,8 +2,16 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { EmojiClickData } from "emoji-picker-react";
 import { EmojiStyle, Theme } from "emoji-picker-react";
+import {
+  MessageCircle,
+  PhoneOff,
+  SendHorizonal,
+  Smile,
+  Video,
+} from "lucide-react";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -75,6 +83,7 @@ export default function ChatPanel({
 }) {
   const [draft, setDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [reactionAnchor, setReactionAnchor] = useState<ReactionAnchor | null>(
     null,
   );
@@ -84,6 +93,10 @@ export default function ChatPanel({
   const reactionPickerRef = useRef<HTMLDivElement>(null);
   const reactionLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -175,15 +188,21 @@ export default function ChatPanel({
     <div
       className={
         embedded
-          ? "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-100 portrait:max-w-none landscape:max-w-md landscape:shrink-0"
-          : "absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl"
+          ? "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] portrait:max-w-none landscape:max-w-md landscape:shrink-0"
+          : "animate-slide-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-base)]/92 text-[var(--text-primary)] shadow-2xl"
       }
     >
       {!embedded && (
-        <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+        <header className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/80 px-4 py-3 backdrop-blur-md">
           <div>
-            <p className="font-semibold">{peerName}</p>
-            <p className="text-xs text-zinc-500">
+            <div className="flex items-center gap-2">
+              <p className="text-base font-semibold">{peerName}</p>
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${connected ? "bg-[var(--accent)]" : "animate-pulse bg-amber-400"}`}
+                aria-hidden
+              />
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">
               {connected ? "Connected" : "Connecting…"}
             </p>
           </div>
@@ -191,14 +210,16 @@ export default function ChatPanel({
             <button
               onClick={onStartVideo}
               disabled={!connected || videoBusy}
-              className="rounded-full border border-zinc-700 px-3 py-1.5 text-sm hover:border-zinc-500 disabled:opacity-40"
+              className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border-default)] px-3 py-1.5 text-sm transition duration-200 hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Video call
+              <Video className="h-4 w-4" aria-hidden />
+              Video
             </button>
             <button
               onClick={onEnd}
-              className="rounded-full bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-400"
+              className="flex cursor-pointer items-center gap-1.5 rounded-full bg-red-500 px-3 py-1.5 text-sm font-medium text-white transition duration-200 hover:bg-red-400"
             >
+              <PhoneOff className="h-4 w-4" aria-hidden />
               End
             </button>
           </div>
@@ -207,9 +228,15 @@ export default function ChatPanel({
 
       <div ref={messagesRef} className="flex-1 space-y-2 overflow-y-auto p-4">
         {messages.length === 0 && (
-          <p className="mt-8 text-center text-sm text-zinc-500">
-            Say hello. Messages are peer-to-peer and never stored.
-          </p>
+          <div className="mt-12 flex flex-col items-center gap-3 text-center">
+            <MessageCircle
+              className="h-10 w-10 text-[var(--text-muted)]"
+              aria-hidden
+            />
+            <p className="max-w-[14rem] text-sm text-[var(--text-secondary)]">
+              Say hello. Messages are peer-to-peer and never stored.
+            </p>
+          </div>
         )}
         {messages.map((m) => {
           const reactionGroups = groupReactions(m.reactions);
@@ -227,10 +254,10 @@ export default function ChatPanel({
                 onMouseLeave={scheduleReactionClose}
               >
                 <span
-                  className={`block whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
+                  className={`block whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm shadow-sm ${
                     m.mine
-                      ? "bg-emerald-400 text-zinc-950"
-                      : "bg-zinc-800 text-zinc-100"
+                      ? "bg-gradient-to-br from-emerald-400 to-emerald-500 text-[var(--bg-base)]"
+                      : "border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-primary)]"
                   }`}
                 >
                   {m.text}
@@ -249,21 +276,25 @@ export default function ChatPanel({
                           key={emoji}
                           type="button"
                           onClick={() => onReact(m.nonce, emoji)}
-                          className="inline-flex cursor-pointer items-center gap-0.5 rounded-full border border-emerald-400/60 bg-emerald-400/10 px-2 py-0.5 text-xs transition hover:bg-emerald-400/20"
+                          className="inline-flex cursor-pointer items-center gap-0.5 rounded-full border border-[var(--accent)]/60 bg-[var(--accent-glow)] px-2 py-0.5 text-xs transition duration-200 hover:bg-[var(--accent)]/20"
                         >
                           <span>{emoji}</span>
                           {count > 1 && (
-                            <span className="text-zinc-400">{count}</span>
+                            <span className="text-[var(--text-secondary)]">
+                              {count}
+                            </span>
                           )}
                         </button>
                       ) : (
                         <span
                           key={emoji}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700 bg-zinc-800/80 px-2 py-0.5 text-xs"
+                          className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-0.5 text-xs"
                         >
                           <span>{emoji}</span>
                           {count > 1 && (
-                            <span className="text-zinc-400">{count}</span>
+                            <span className="text-[var(--text-secondary)]">
+                              {count}
+                            </span>
                           )}
                         </span>
                       ),
@@ -276,44 +307,48 @@ export default function ChatPanel({
         <div ref={endRef} />
       </div>
 
-      {reactionAnchor && connected && (
-        <div
-          ref={reactionPickerRef}
-          className="fixed z-50"
-          onMouseEnter={cancelReactionClose}
-          onMouseLeave={scheduleReactionClose}
-          style={{
-            ...(reactionAnchor.mine
-              ? { right: window.innerWidth - reactionAnchor.rect.right }
-              : {
-                  left: Math.min(
-                    window.innerWidth - 308,
-                    Math.max(8, reactionAnchor.rect.left),
-                  ),
-                }),
-            ...(showReactionAbove
-              ? {
-                  top: reactionAnchor.rect.top - 4,
-                  transform: "translateY(-100%)",
-                }
-              : { top: reactionAnchor.rect.bottom + 4 }),
-          }}
-        >
-          <EmojiPicker
-            {...PICKER_PROPS}
-            reactionsDefaultOpen
-            allowExpandReactions={false}
-            reactions={REACTION_EMOJIS}
-            onReactionClick={(data) =>
-              onReactionClick(reactionAnchor.nonce, data)
-            }
-          />
-        </div>
-      )}
+      {isMounted &&
+        reactionAnchor &&
+        connected &&
+        createPortal(
+          <div
+            ref={reactionPickerRef}
+            className="fixed z-[9999]"
+            onMouseEnter={cancelReactionClose}
+            onMouseLeave={scheduleReactionClose}
+            style={{
+              ...(reactionAnchor.mine
+                ? { right: window.innerWidth - reactionAnchor.rect.right }
+                : {
+                    left: Math.min(
+                      window.innerWidth - 308,
+                      Math.max(8, reactionAnchor.rect.left),
+                    ),
+                  }),
+              ...(showReactionAbove
+                ? {
+                    top: reactionAnchor.rect.top - 4,
+                    transform: "translateY(-100%)",
+                  }
+                : { top: reactionAnchor.rect.bottom + 4 }),
+            }}
+          >
+            <EmojiPicker
+              {...PICKER_PROPS}
+              reactionsDefaultOpen
+              allowExpandReactions={false}
+              reactions={REACTION_EMOJIS}
+              onReactionClick={(data) =>
+                onReactionClick(reactionAnchor.nonce, data)
+              }
+            />
+          </div>,
+          document.body,
+        )}
 
       <form
         onSubmit={submit}
-        className="relative flex items-end gap-2 border-t border-zinc-800 p-3"
+        className="relative flex items-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3"
       >
         {pickerOpen && (
           <div
@@ -327,10 +362,10 @@ export default function ChatPanel({
           type="button"
           onClick={() => setPickerOpen((open) => !open)}
           disabled={!connected}
-          className="shrink-0 rounded-full px-2 py-2 text-lg leading-none transition hover:bg-zinc-800 disabled:opacity-40"
+          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] transition duration-200 hover:bg-white/5 hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Add emoji"
         >
-          😊
+          <Smile className="h-5 w-5" aria-hidden />
         </button>
         <textarea
           ref={inputRef}
@@ -340,14 +375,15 @@ export default function ChatPanel({
           placeholder={connected ? "Type a message…" : "Connecting…"}
           disabled={!connected}
           rows={1}
-          className="max-h-[120px] min-h-[2.5rem] flex-1 resize-none rounded-2xl bg-zinc-900 px-4 py-2 text-sm outline-none placeholder:text-zinc-600 focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+          className="max-h-[120px] min-h-[2.5rem] flex-1 resize-none rounded-2xl border border-transparent bg-[var(--bg-elevated)] px-4 py-2 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-glow)] disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={!connected || !draft.trim()}
-          className="shrink-0 rounded-full bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40"
+          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[var(--accent)] text-[var(--bg-base)] transition duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Send message"
         >
-          Send
+          <SendHorizonal className="h-4 w-4" aria-hidden />
         </button>
       </form>
     </div>

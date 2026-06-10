@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2, ShieldCheck } from "lucide-react";
 import GenderIcon from "@/app/components/GenderIcon";
 import { reverseGeocode } from "@/lib/reverseGeocode";
 import type { Gender } from "@/lib/types";
@@ -52,72 +53,94 @@ export default function EntryGate({
             : "Couldn't get your location. Please try again.",
         );
       },
-      // High accuracy + maximumAge:0 forces a fresh fix (Wi-Fi/GPS scan)
-      // instead of reusing the browser's cached IP-based location.
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
     );
   }
 
   return (
-    <div className="flex min-h-full flex-1 flex-col items-center justify-center gap-8 bg-zinc-950 p-6 text-zinc-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight">Pulse</h1>
-        <p className="mt-2 max-w-sm text-zinc-400">
-          A living globe of anonymous strangers. Drop onto the map and connect.
+    <div className="entry-aurora flex min-h-full flex-1 flex-col items-center justify-center p-6 text-[var(--text-primary)]">
+      <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-8">
+        <div className="animate-fade-up text-center">
+          <h1 className="pulse-logo text-6xl font-bold tracking-tight">
+            Pulse<span className="pulse-logo-dot text-[var(--accent)]">.</span>
+          </h1>
+          <p className="mt-3 max-w-xs text-[var(--text-secondary)]">
+            A living globe of anonymous strangers. Drop onto the map and
+            connect.
+          </p>
+        </div>
+
+        <div className="panel-glass animate-fade-up-delay-1 w-full rounded-3xl p-8 shadow-2xl">
+          <div className="flex flex-col gap-5">
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-[var(--text-secondary)]">
+                Your name
+              </span>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={30}
+                placeholder="What should we call you?"
+                className="h-12 cursor-text rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-4 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)]"
+              />
+            </label>
+
+            <fieldset className="flex flex-col gap-2">
+              <legend className="text-sm font-medium text-[var(--text-secondary)]">
+                Gender
+              </legend>
+              <div className="flex gap-2">
+                {GENDER_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setGender(opt.value)}
+                    className={`flex flex-1 cursor-pointer flex-col items-center gap-2 rounded-xl border px-3 py-3 text-sm transition duration-200 ${
+                      gender === opt.value
+                        ? "border-[var(--accent)] bg-[var(--accent-glow)] text-[var(--accent)] shadow-[0_0_16px_var(--accent-glow)]"
+                        : "border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:border-white/20 hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    <GenderIcon gender={opt.value} />
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <button
+              onClick={() => void enter()}
+              disabled={!canEnter || status === "locating"}
+              className="btn-shimmer flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[var(--accent)] font-semibold text-[var(--bg-base)] transition duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {status === "locating" ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                  Locating…
+                </>
+              ) : (
+                "Enter Pulse"
+              )}
+            </button>
+
+            {status === "error" && (
+              <p className="text-center text-sm text-red-400">{error}</p>
+            )}
+          </div>
+        </div>
+
+        <p className="animate-fade-up-delay-2 flex max-w-xs items-start gap-2 text-center text-xs text-[var(--text-muted)]">
+          <ShieldCheck
+            className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]"
+            aria-hidden
+          />
+          <span>
+            No sign-up. Your dot is placed 1–3&nbsp;km from your real location.
+            Nothing is stored — closing the tab ends everything.
+          </span>
         </p>
       </div>
-
-      <div className="flex w-full max-w-sm flex-col gap-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm text-zinc-400">Your name</span>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={30}
-            placeholder="What should we call you?"
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-400 focus:outline-none"
-          />
-        </label>
-
-        <fieldset className="flex flex-col gap-1.5">
-          <legend className="text-sm text-zinc-400">Gender</legend>
-          <div className="flex gap-2">
-            {GENDER_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setGender(opt.value)}
-                className={`flex flex-1 flex-col items-center gap-1 rounded-lg border px-3 py-2.5 text-sm transition ${
-                  gender === opt.value
-                    ? "border-emerald-400 bg-emerald-400/10 text-emerald-300"
-                    : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-600"
-                }`}
-              >
-                <GenderIcon gender={opt.value} />
-                <span>{opt.label}</span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
-      </div>
-
-      <button
-        onClick={() => void enter()}
-        disabled={!canEnter || status === "locating"}
-        className="rounded-full bg-emerald-400 px-8 py-3 font-semibold text-zinc-950 transition hover:bg-emerald-300 disabled:opacity-60"
-      >
-        {status === "locating" ? "Locating…" : "Enter Pulse"}
-      </button>
-
-      {status === "error" && (
-        <p className="max-w-sm text-center text-sm text-red-400">{error}</p>
-      )}
-
-      <p className="max-w-sm text-center text-xs text-zinc-500">
-        No sign-up. Your dot is placed 1–3&nbsp;km from your real location.
-        Nothing is stored — closing the tab ends everything.
-      </p>
     </div>
   );
 }

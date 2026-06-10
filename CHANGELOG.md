@@ -2,6 +2,30 @@
 
 All notable changes to Pulse are documented here.
 
+## [1.4.0]
+
+### Added
+
+- **Design system**: CSS tokens for a blue-black OLED palette, emerald accent, glass panels, and entrance animations (`fade-up`, `scale-in`, `slide-right`) with `prefers-reduced-motion` support.
+- **Lucide icons**: Consistent SVG icons across the entry gate, bottom bar, chat panel, connection prompts, changelog, video controls, and status toasts (`lucide-react`).
+- **Entry gate redesign**: Animated aurora background, glowing logo, glassmorphism card, shimmer CTA, and loading spinner while locating.
+- **Connection prompt icons**: Contextual Lucide icon above the title (`UserPlus` for chat, `Video` for video requests).
+- **Map marker polish**: Pulsing peer dots with gender-colored rings; name and gender labels appear on hover only.
+- **Your map pin**: Red SVG location pin (replacing the emoji); label shows **Me** instead of your entered name.
+
+### Changed
+
+- **Typography**: Geist Sans applied globally via `layout.tsx` and CSS variables (replacing Arial).
+- **Chat panel**: Gradient message bubbles, icon send/emoji/video/end buttons, slide-in animation, and glass-styled header.
+- **Bottom bar**: Glass pill with Lucide icons, live pulse dot beside online count, animated filter dropdown.
+- **Chat tabs**: Glass pills with staggered fade-in and accent glow on the active tab.
+- **Modals and toasts**: Glass treatment, scale-in animations, and Lucide icons on changelog and status banners.
+- **Video panel**: Unified glass control bar, larger PiP with ring border, spinner while waiting for remote video.
+
+### Fixed
+
+- **Reaction picker on peer messages**: Quick-reaction bar now renders via a React portal to `document.body`, so `backdrop-filter` and slide-in `transform` on the chat panel no longer trap `fixed` positioning off-screen.
+
 ## [1.3.0]
 
 ### Added
