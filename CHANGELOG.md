@@ -4,6 +4,24 @@ All notable changes to Pulse are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0]
+
+### Added
+
+- **Emoji picker in chat**: Compose bar includes an emoji button with `emoji-picker-react` (native emoji style, dark theme).
+- **Multiline messages**: Chat input is a textarea; Enter sends, Shift+Enter adds a new line.
+- **Message reactions**: Hover a message to open a quick-reaction bar; reactions sync peer-to-peer over the WebRTC data channel.
+- **Reaction pills**: Reactions appear below messages with counts; tap your own pill to remove it.
+
+### Changed
+
+- **Chat transport**: Messages carry a `nonce` so reactions can target the correct bubble on both sides.
+- **Reaction picker UX**: Fixed positioning with smart above/below flip near the top of the scroll area; 250ms hover delay so the bar stays open while moving to it.
+
+### Fixed
+
+- **Emoji picker scrollbar**: Dark scrollbar styling on the picker body to match the changelog panel.
+
 ## [1.1.0]
 
 ### Added

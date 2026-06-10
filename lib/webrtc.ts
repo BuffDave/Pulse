@@ -8,7 +8,9 @@ export type PeerControl =
 
 interface PeerCallbacks {
   onSignal: (type: DescType, payload: string) => void;
-  onChat: (text: string) => void;
+  onChat: (text: string, nonce: string) => void;
+  onReaction: (nonce: string, emoji: string) => void;
+  onUnreaction: (nonce: string, emoji: string) => void;
   onControl: (ctrl: PeerControl) => void;
   onRemoteStream: (stream: MediaStream | null) => void;
   onConnectionState: (state: RTCPeerConnectionState) => void;
@@ -77,8 +79,24 @@ export class PeerSession {
     dc.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data as string);
-        if (msg.t === "chat" && typeof msg.text === "string") {
-          this.cb.onChat(msg.text);
+        if (
+          msg.t === "chat" &&
+          typeof msg.text === "string" &&
+          typeof msg.nonce === "string"
+        ) {
+          this.cb.onChat(msg.text, msg.nonce);
+        } else if (
+          msg.t === "react" &&
+          typeof msg.nonce === "string" &&
+          typeof msg.emoji === "string"
+        ) {
+          this.cb.onReaction(msg.nonce, msg.emoji);
+        } else if (
+          msg.t === "unreact" &&
+          typeof msg.nonce === "string" &&
+          typeof msg.emoji === "string"
+        ) {
+          this.cb.onUnreaction(msg.nonce, msg.emoji);
         } else if (msg.t === "ctrl" && typeof msg.ctrl === "string") {
           this.cb.onControl(msg.ctrl as PeerControl);
         }
@@ -129,8 +147,16 @@ export class PeerSession {
     }
   }
 
-  sendChat(text: string) {
-    this.safeSend({ t: "chat", text });
+  sendChat(text: string, nonce: string) {
+    this.safeSend({ t: "chat", text, nonce });
+  }
+
+  sendReaction(nonce: string, emoji: string) {
+    this.safeSend({ t: "react", nonce, emoji });
+  }
+
+  sendUnreaction(nonce: string, emoji: string) {
+    this.safeSend({ t: "unreact", nonce, emoji });
   }
 
   sendControl(ctrl: PeerControl) {

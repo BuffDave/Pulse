@@ -162,7 +162,12 @@ export default function Home() {
     if (message) showNotice(message);
   }, []);
 
-  function addMessage(peerId: string, mine: boolean, text: string) {
+  function addMessage(
+    peerId: string,
+    mine: boolean,
+    text: string,
+    nonce: string,
+  ) {
     const isActive = activePeerIdRef.current === peerId;
     setSessions((prev) => {
       const session = prev.get(peerId);
@@ -170,8 +175,65 @@ export default function Home() {
       const next = cloneSessions(prev);
       next.set(peerId, {
         ...session,
-        messages: [...session.messages, { id: msgId.current++, mine, text }],
+        messages: [
+          ...session.messages,
+          { id: msgId.current++, mine, text, nonce, reactions: [] },
+        ],
         unread: isActive ? session.unread : session.unread + 1,
+      });
+      return next;
+    });
+  }
+
+  function addReaction(
+    peerId: string,
+    nonce: string,
+    emoji: string,
+    mine: boolean,
+  ) {
+    setSessions((prev) => {
+      const session = prev.get(peerId);
+      if (!session) return prev;
+      const next = cloneSessions(prev);
+      next.set(peerId, {
+        ...session,
+        messages: session.messages.map((m) => {
+          if (m.nonce !== nonce) return m;
+          if (m.reactions.some((r) => r.mine === mine && r.emoji === emoji)) {
+            return m;
+          }
+          return {
+            ...m,
+            reactions: [...m.reactions, { emoji, mine }],
+          };
+        }),
+      });
+      return next;
+    });
+  }
+
+  function removeReaction(
+    peerId: string,
+    nonce: string,
+    emoji: string,
+    mine: boolean,
+  ) {
+    setSessions((prev) => {
+      const session = prev.get(peerId);
+      if (!session) return prev;
+      const next = cloneSessions(prev);
+      next.set(peerId, {
+        ...session,
+        messages: session.messages.map((m) => {
+          if (m.nonce !== nonce) return m;
+          const idx = m.reactions.findIndex(
+            (r) => r.mine === mine && r.emoji === emoji,
+          );
+          if (idx === -1) return m;
+          const reactions = [...m.reactions];
+          reactions.splice(idx, 1);
+          return { ...m, reactions };
+        }),
       });
       return next;
     });
@@ -250,7 +312,10 @@ export default function Home() {
       onSignal: (type: DescType, payload: string) => {
         void sendSignal(sessionId, peerId, type, payload);
       },
-      onChat: (text) => addMessage(peerId, false, text),
+      onChat: (text, nonce) => addMessage(peerId, false, text, nonce),
+      onReaction: (nonce, emoji) => addReaction(peerId, nonce, emoji, false),
+      onUnreaction: (nonce, emoji) =>
+        removeReaction(peerId, nonce, emoji, false),
       onControl: (ctrl) => handleControl(peerId, ctrl),
       onRemoteStream: (stream) => {
         updateSession(peerId, (s) => ({ ...s, remoteStream: stream }));
@@ -595,8 +660,21 @@ export default function Home() {
               connected={activeSession.conn === "connected"}
               videoBusy={activeSession.video !== "none"}
               onSend={(text) => {
-                activeSession.peer.sendChat(text);
-                addMessage(activeSession.peerId, true, text);
+                const nonce = crypto.randomUUID();
+                activeSession.peer.sendChat(text, nonce);
+                addMessage(activeSession.peerId, true, text, nonce);
+              }}
+              onReact={(nonce, emoji) => {
+                const hasMine = activeSession.messages
+                  .find((m) => m.nonce === nonce)
+                  ?.reactions.some((r) => r.mine && r.emoji === emoji);
+                if (hasMine) {
+                  activeSession.peer.sendUnreaction(nonce, emoji);
+                  removeReaction(activeSession.peerId, nonce, emoji, true);
+                } else {
+                  activeSession.peer.sendReaction(nonce, emoji);
+                  addReaction(activeSession.peerId, nonce, emoji, true);
+                }
               }}
               onStartVideo={() => startVideoRequest(activeSession.peerId)}
               onEnd={() => endConnection(activeSession.peerId)}

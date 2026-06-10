@@ -1,11 +1,48 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+import type { EmojiClickData } from "emoji-picker-react";
+import { EmojiStyle, Theme } from "emoji-picker-react";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
+
+const REACTION_EMOJIS = ["1f44d", "2764-fe0f", "1f602", "1f62e", "1f622", "1f621"];
+
+const PICKER_PROPS = {
+  theme: Theme.DARK,
+  emojiStyle: EmojiStyle.NATIVE,
+  skinTonesDisabled: true,
+  lazyLoadEmojis: false,
+  autoFocusSearch: false,
+} as const;
 
 export interface ChatMessage {
   id: number;
   mine: boolean;
   text: string;
+  nonce: string;
+  reactions: Array<{ emoji: string; mine: boolean }>;
+}
+
+interface ReactionAnchor {
+  nonce: string;
+  rect: DOMRect;
+  mine: boolean;
+}
+
+function groupReactions(reactions: ChatMessage["reactions"]) {
+  const groups = new Map<string, { count: number; hasMine: boolean }>();
+  for (const r of reactions) {
+    const existing = groups.get(r.emoji);
+    if (existing) {
+      existing.count++;
+      if (r.mine) existing.hasMine = true;
+    } else {
+      groups.set(r.emoji, { count: 1, hasMine: r.mine });
+    }
+  }
+  return groups;
 }
 
 export default function ChatPanel({
@@ -14,6 +51,7 @@ export default function ChatPanel({
   connected,
   videoBusy,
   onSend,
+  onReact,
   onStartVideo,
   onEnd,
 }: {
@@ -22,15 +60,58 @@ export default function ChatPanel({
   connected: boolean;
   videoBusy: boolean;
   onSend: (text: string) => void;
+  onReact: (nonce: string, emoji: string) => void;
   onStartVideo: () => void;
   onEnd: () => void;
 }) {
   const [draft, setDraft] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [reactionAnchor, setReactionAnchor] = useState<ReactionAnchor | null>(
+    null,
+  );
   const endRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
+  const reactionLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [draft]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (pickerRef.current?.contains(e.target as Node)) return;
+      setPickerOpen(false);
+    }
+    const id = window.setTimeout(() => {
+      document.addEventListener("pointerdown", onPointerDown);
+    }, 0);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [pickerOpen]);
+
+  useEffect(() => {
+    if (!reactionAnchor) return;
+    function onScroll() {
+      setReactionAnchor(null);
+    }
+    messagesRef.current?.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      messagesRef.current?.removeEventListener("scroll", onScroll);
+    };
+  }, [reactionAnchor]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,6 +120,49 @@ export default function ChatPanel({
     onSend(text);
     setDraft("");
   }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submit(e);
+    }
+  }
+
+  function onEmojiClick(data: EmojiClickData) {
+    setDraft((d) => d + data.emoji);
+    setPickerOpen(false);
+    inputRef.current?.focus();
+  }
+
+  function onReactionClick(nonce: string, data: EmojiClickData) {
+    onReact(nonce, data.emoji);
+    setReactionAnchor(null);
+  }
+
+  function cancelReactionClose() {
+    if (reactionLeaveTimer.current) {
+      clearTimeout(reactionLeaveTimer.current);
+      reactionLeaveTimer.current = null;
+    }
+  }
+
+  function scheduleReactionClose() {
+    cancelReactionClose();
+    reactionLeaveTimer.current = setTimeout(() => setReactionAnchor(null), 250);
+  }
+
+  function openReactionPicker(
+    nonce: string,
+    mine: boolean,
+    el: HTMLElement,
+  ) {
+    if (!connected) return;
+    cancelReactionClose();
+    setReactionAnchor({ nonce, rect: el.getBoundingClientRect(), mine });
+  }
+
+  const showReactionAbove =
+    reactionAnchor !== null && reactionAnchor.rect.top > 56;
 
   return (
     <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl">
@@ -66,43 +190,145 @@ export default function ChatPanel({
         </div>
       </header>
 
-      <div className="flex-1 space-y-2 overflow-y-auto p-4">
+      <div ref={messagesRef} className="flex-1 space-y-2 overflow-y-auto p-4">
         {messages.length === 0 && (
           <p className="mt-8 text-center text-sm text-zinc-500">
             Say hello. Messages are peer-to-peer and never stored.
           </p>
         )}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`flex ${m.mine ? "justify-end" : "justify-start"}`}
-          >
-            <span
-              className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
-                m.mine
-                  ? "bg-emerald-400 text-zinc-950"
-                  : "bg-zinc-800 text-zinc-100"
-              }`}
+        {messages.map((m) => {
+          const reactionGroups = groupReactions(m.reactions);
+
+          return (
+            <div
+              key={m.id}
+              className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}
             >
-              {m.text}
-            </span>
-          </div>
-        ))}
+              <div
+                className="max-w-[80%]"
+                onMouseEnter={(e) =>
+                  openReactionPicker(m.nonce, m.mine, e.currentTarget)
+                }
+                onMouseLeave={scheduleReactionClose}
+              >
+                <span
+                  className={`block whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
+                    m.mine
+                      ? "bg-emerald-400 text-zinc-950"
+                      : "bg-zinc-800 text-zinc-100"
+                  }`}
+                >
+                  {m.text}
+                </span>
+              </div>
+              {reactionGroups.size > 0 && (
+                <div
+                  className={`mt-1 flex flex-wrap gap-1 ${
+                    m.mine ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  {[...reactionGroups.entries()].map(
+                    ([emoji, { count, hasMine }]) =>
+                      hasMine ? (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => onReact(m.nonce, emoji)}
+                          className="inline-flex cursor-pointer items-center gap-0.5 rounded-full border border-emerald-400/60 bg-emerald-400/10 px-2 py-0.5 text-xs transition hover:bg-emerald-400/20"
+                        >
+                          <span>{emoji}</span>
+                          {count > 1 && (
+                            <span className="text-zinc-400">{count}</span>
+                          )}
+                        </button>
+                      ) : (
+                        <span
+                          key={emoji}
+                          className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700 bg-zinc-800/80 px-2 py-0.5 text-xs"
+                        >
+                          <span>{emoji}</span>
+                          {count > 1 && (
+                            <span className="text-zinc-400">{count}</span>
+                          )}
+                        </span>
+                      ),
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={submit} className="flex gap-2 border-t border-zinc-800 p-3">
-        <input
+      {reactionAnchor && connected && (
+        <div
+          ref={reactionPickerRef}
+          className="fixed z-50"
+          onMouseEnter={cancelReactionClose}
+          onMouseLeave={scheduleReactionClose}
+          style={{
+            left: reactionAnchor.mine
+              ? Math.max(8, reactionAnchor.rect.right - 300)
+              : Math.min(
+                  window.innerWidth - 308,
+                  Math.max(8, reactionAnchor.rect.left),
+                ),
+            ...(showReactionAbove
+              ? {
+                  top: reactionAnchor.rect.top - 4,
+                  transform: "translateY(-100%)",
+                }
+              : { top: reactionAnchor.rect.bottom + 4 }),
+          }}
+        >
+          <EmojiPicker
+            {...PICKER_PROPS}
+            reactionsDefaultOpen
+            allowExpandReactions={false}
+            reactions={REACTION_EMOJIS}
+            onReactionClick={(data) =>
+              onReactionClick(reactionAnchor.nonce, data)
+            }
+          />
+        </div>
+      )}
+
+      <form
+        onSubmit={submit}
+        className="relative flex items-end gap-2 border-t border-zinc-800 p-3"
+      >
+        {pickerOpen && (
+          <div
+            ref={pickerRef}
+            className="absolute bottom-full left-0 z-50 mb-2 max-w-[min(100vw-2rem,320px)]"
+          >
+            <EmojiPicker {...PICKER_PROPS} onEmojiClick={onEmojiClick} />
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setPickerOpen((open) => !open)}
+          disabled={!connected}
+          className="shrink-0 rounded-full px-2 py-2 text-lg leading-none transition hover:bg-zinc-800 disabled:opacity-40"
+          aria-label="Add emoji"
+        >
+          😊
+        </button>
+        <textarea
+          ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder={connected ? "Type a message…" : "Connecting…"}
           disabled={!connected}
-          className="flex-1 rounded-full bg-zinc-900 px-4 py-2 text-sm outline-none placeholder:text-zinc-600 focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+          rows={1}
+          className="max-h-[120px] min-h-[2.5rem] flex-1 resize-none rounded-2xl bg-zinc-900 px-4 py-2 text-sm outline-none placeholder:text-zinc-600 focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={!connected || !draft.trim()}
-          className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40"
+          className="shrink-0 rounded-full bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40"
         >
           Send
         </button>
