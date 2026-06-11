@@ -1,10 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Info, Loader2, UserPlus, Video, WifiOff } from "lucide-react";
 import CreatedByCredit from "./components/CreatedByCredit";
 import EntryGate from "./components/EntryGate";
-import WorldMap from "./components/WorldMap";
+
+const WorldMap = dynamic(() => import("./components/WorldMap"), { ssr: false });
 import ConnectionPrompt from "./components/ConnectionPrompt";
 import ChatPanel, { type ChatMessage } from "./components/ChatPanel";
 import ChatTabs from "./components/ChatTabs";
@@ -15,7 +17,6 @@ import ActivityFeed, {
   type ActivityFeedItem,
 } from "./components/ActivityFeed";
 import ChangelogPanel from "./components/ChangelogPanel";
-import changelogContent from "../CHANGELOG.md";
 import {
   clearBroadcast,
   getIceServers,
@@ -156,6 +157,7 @@ export default function Home() {
         newItems.push({
           id: `${peer.id}-${now}`,
           name: peer.name,
+          location: peer.location,
           text: peer.broadcastText,
           addedAt: now,
         });
@@ -174,6 +176,7 @@ export default function Home() {
     pushBroadcastItem({
       id: `${sessionId}-${now}`,
       name: myName,
+      location: myLocationLabel,
       text,
       addedAt: now,
     });
@@ -1122,7 +1125,6 @@ export default function Home() {
       )}
 
       <ChangelogPanel
-        content={changelogContent}
         open={changelogOpen}
         onClose={() => setChangelogOpen(false)}
       />

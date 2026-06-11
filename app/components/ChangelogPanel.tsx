@@ -2,13 +2,12 @@
 
 import { ScrollText, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import changelogContent from "../../CHANGELOG.md";
 
 export default function ChangelogPanel({
-  content,
   open,
   onClose,
 }: {
-  content: string;
   open: boolean;
   onClose: () => void;
 }) {
@@ -87,7 +86,7 @@ export default function ChangelogPanel({
               ),
             }}
           >
-            {content}
+            {changelogContent}
           </ReactMarkdown>
         </div>
       </div>

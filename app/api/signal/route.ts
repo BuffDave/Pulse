@@ -32,7 +32,14 @@ export async function POST(request: NextRequest) {
     unknown
   >;
 
-  if (typeof fromId !== "string" || typeof toId !== "string") {
+  if (
+    typeof fromId !== "string" ||
+    fromId.length < 8 ||
+    fromId.length > 64 ||
+    typeof toId !== "string" ||
+    toId.length < 8 ||
+    toId.length > 64
+  ) {
     return Response.json({ error: "invalid ids" }, { status: 400 });
   }
   if (typeof type !== "string" || !VALID_TYPES.includes(type as SignalType)) {

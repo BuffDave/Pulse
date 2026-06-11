@@ -45,6 +45,7 @@ model Report {
   reportedId  String
   createdAt   DateTime @default(now())
 
+  @@unique([reporterId, reportedId])
   @@index([reportedId])
   @@index([createdAt])
 }

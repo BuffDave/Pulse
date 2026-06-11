@@ -2,6 +2,33 @@
 
 All notable changes to Pulse are documented here.
 
+## [1.7.0]
+
+### Added
+
+- **Megaphone emoji picker**: Smile button in the expanded megaphone bar opens `emoji-picker-react` below the input; emojis append to broadcast text (capped at 100 characters).
+- **Activity feed location**: Broadcast notifications show peer location inline (e.g. *Stranger from California, US*).
+- **SEO metadata**: `metadataBase`, Open Graph, Twitter card, canonical URL, and robots directives in the root layout.
+- **Discoverability**: `app/robots.ts` and `app/sitemap.ts` for crawlers; `NEXT_PUBLIC_APP_URL` env var for production URL.
+- **OG image**: Build-time script generates `public/opengraph-image.png` (1200×630) for link previews.
+- **Security headers**: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, and `Permissions-Policy` on all routes via `next.config.ts`.
+- **Full API rate limiting**: Proxy throttles all eight API routes per IP (`/api/poll`, `/api/ice`, `/api/megaphone`, `/api/busy`, `/api/leave` added to existing join/signal/report limits).
+- **Report deduplication**: `@@unique([reporterId, reportedId])` on `Report`; `/api/report` upserts so repeat reports from the same user are idempotent.
+
+### Changed
+
+- **Activity feed sizing**: Wider cards (19rem), larger name and message text, and more padding for readability.
+- **Megaphone picker placement**: Emoji picker opens below the bar (not above) so it is not clipped by the top of the screen on mobile.
+- **TURN credential TTL**: Cloudflare ICE credentials reduced from 24 hours to 1 hour to limit abuse if leaked.
+- **Middleware → proxy**: Rate limiting moved from deprecated `middleware.ts` to `proxy.ts` (Next.js 16 convention).
+- **Bundle performance**: `WorldMap` is dynamically imported so Mapbox GL does not load on the entry gate; changelog markdown is bundled only with `ChangelogPanel`.
+- **Build pipeline**: Icon and OG image generation run before `next build`; `optimizePackageImports` for `lucide-react`.
+- **`.env.example`**: Documents `NEXT_PUBLIC_APP_URL` and recommends `sslmode=verify-full` for Postgres.
+
+### Fixed
+
+- **Inconsistent API validation**: Poll, leave, and signal routes now enforce the same 8–64 character session ID bounds as join and megaphone.
+
 ## [1.6.0]
 
 ### Added

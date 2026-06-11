@@ -33,8 +33,12 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "cannot report self" }, { status: 400 });
   }
 
-  await prisma.report.create({
-    data: { reporterId, reportedId },
+  await prisma.report.upsert({
+    where: {
+      reporterId_reportedId: { reporterId, reportedId },
+    },
+    create: { reporterId, reportedId },
+    update: {},
   });
 
   return Response.json({ ok: true });

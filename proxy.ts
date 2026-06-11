@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import type { ProxyConfig } from "next/server";
 
 // TODO: swap in-memory store for Upstash Redis on multi-instance production.
 const buckets = new Map<string, { count: number; windowStart: number }>();
@@ -8,6 +9,11 @@ const LIMITS: Record<string, number> = {
   "/api/join": 10,
   "/api/signal": 120,
   "/api/report": 5,
+  "/api/poll": 120,
+  "/api/ice": 5,
+  "/api/megaphone": 20,
+  "/api/busy": 30,
+  "/api/leave": 10,
 };
 
 const WINDOW_MS = 60_000;
@@ -31,7 +37,7 @@ function isRateLimited(key: string, limit: number): boolean {
   return entry.count > limit;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const limit = LIMITS[pathname];
   if (!limit) return NextResponse.next();
@@ -46,6 +52,15 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = {
-  matcher: ["/api/join", "/api/signal", "/api/report"],
+export const config: ProxyConfig = {
+  matcher: [
+    "/api/join",
+    "/api/signal",
+    "/api/report",
+    "/api/poll",
+    "/api/ice",
+    "/api/megaphone",
+    "/api/busy",
+    "/api/leave",
+  ],
 };

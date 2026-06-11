@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     id = undefined;
   }
 
-  if (typeof id !== "string" || !id) {
+  if (typeof id !== "string" || id.length < 8 || id.length > 64) {
     return Response.json({ error: "invalid id" }, { status: 400 });
   }
 

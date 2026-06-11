@@ -7,6 +7,7 @@ import { peerDisplayName } from "@/lib/peerDisplay";
 export interface ActivityFeedItem {
   id: string;
   name: string;
+  location: string;
   text: string;
   addedAt: number;
 }
@@ -54,28 +55,34 @@ export default function ActivityFeed({ items }: { items: ActivityFeedItem[] }) {
 
   return (
     <div
-      className="pointer-events-none absolute left-4 top-1/2 z-30 w-[min(100vw-3rem,16rem)] -translate-y-1/2"
+      className="pointer-events-none absolute left-4 top-1/2 z-30 w-[min(100vw-3rem,19rem)] -translate-y-1/2"
       style={{ left: "max(1rem, env(safe-area-inset-left))" }}
       aria-live="polite"
       aria-label="Megaphone activity"
     >
-      <div className="feed-stack flex flex-col gap-2">
+      <div className="feed-stack flex flex-col gap-2.5">
         {visible.map((item, index) => (
           <div
             key={item.id}
             className="transition-[transform,opacity] duration-300"
             style={stackStyle(index)}
           >
-            <div className="feed-item panel-glass pointer-events-auto flex items-start gap-2 rounded-xl px-3 py-2.5 shadow-lg">
+            <div className="feed-item panel-glass pointer-events-auto flex items-start gap-2.5 rounded-xl px-3.5 py-3 shadow-lg">
               <Megaphone
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent)]"
+                className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]"
                 aria-hidden
               />
               <div className="min-w-0">
-                <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-[var(--accent)]">
+                <p className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">
                   {peerDisplayName(item.name)}
+                  {item.location ? (
+                    <span className="font-normal normal-case tracking-normal text-[var(--text-secondary)]">
+                      {" "}
+                      from {item.location}
+                    </span>
+                  ) : null}
                 </p>
-                <p className="mt-0.5 text-xs leading-snug text-[var(--text-primary)]">
+                <p className="mt-1 text-sm leading-snug text-[var(--text-primary)]">
                   {item.text}
                 </p>
               </div>

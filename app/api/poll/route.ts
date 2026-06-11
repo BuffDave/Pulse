@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const id = params.get("id");
 
-  if (!id) {
-    return Response.json({ error: "missing id" }, { status: 400 });
+  if (!id || id.length < 8 || id.length > 64) {
+    return Response.json({ error: "invalid id" }, { status: 400 });
   }
 
   const now = Date.now();

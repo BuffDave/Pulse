@@ -31,7 +31,7 @@ export async function GET() {
           Authorization: `Bearer ${apiToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ttl: 86_400 }),
+        body: JSON.stringify({ ttl: 3_600 }),
       },
     );
 
