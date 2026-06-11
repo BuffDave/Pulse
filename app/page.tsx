@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Info, Loader2, UserPlus, Video } from "lucide-react";
+import { Info, Loader2, UserPlus, Video, WifiOff } from "lucide-react";
+import CreatedByCredit from "./components/CreatedByCredit";
 import EntryGate from "./components/EntryGate";
 import WorldMap from "./components/WorldMap";
 import ConnectionPrompt from "./components/ConnectionPrompt";
@@ -11,11 +12,24 @@ import VideoPanel from "./components/VideoPanel";
 import BottomBar, { type GenderFilter } from "./components/BottomBar";
 import ChangelogPanel from "./components/ChangelogPanel";
 import changelogContent from "../CHANGELOG.md";
-import { join, leave, poll, sendSignal } from "@/lib/api";
+import {
+  getIceServers,
+  join,
+  leave,
+  poll,
+  reportPeer,
+  sendSignal,
+  setBusy,
+} from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
 import { peerDisplayName } from "@/lib/peerDisplay";
-import { type Gender, type PeerDot, type SignalMsg } from "@/lib/types";
+import {
+  type Gender,
+  type Mood,
+  type PeerDot,
+  type SignalMsg,
+} from "@/lib/types";
 
 type VideoState = "none" | "requesting" | "incoming" | "active";
 
@@ -38,6 +52,8 @@ interface ChatSession {
   remoteStream: MediaStream | null;
   audioMuted: boolean;
   cameraEnabled: boolean;
+  screenSharing: boolean;
+  isTyping: boolean;
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -66,8 +82,15 @@ export default function Home() {
   const [myLocationLabel, setMyLocationLabel] = useState("");
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
+  const [connectionStatus, setConnectionStatus] = useState<
+    "online" | "reconnecting"
+  >("online");
 
   const sessionsRef = useRef(sessions);
+  const iceServersRef = useRef<RTCIceServer[]>([]);
+  const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
   const activePeerIdRef = useRef(activePeerId);
   const incomingPeerIdRef = useRef(incomingPeerId);
   const requestingPeerIdRef = useRef(requestingPeerId);
@@ -101,6 +124,19 @@ export default function Home() {
   function showNotice(text: string) {
     setNotice(text);
     window.setTimeout(() => setNotice(null), 3500);
+  }
+
+  function handlePeerTyping(peerId: string) {
+    updateSession(peerId, (s) => ({ ...s, isTyping: true }));
+    const existing = typingTimers.current.get(peerId);
+    if (existing) clearTimeout(existing);
+    typingTimers.current.set(
+      peerId,
+      setTimeout(() => {
+        typingTimers.current.delete(peerId);
+        updateSession(peerId, (s) => ({ ...s, isTyping: false }));
+      }, 2500),
+    );
   }
 
   function mediaErrorMessage(err: unknown): string {
@@ -329,6 +365,7 @@ export default function Home() {
           video: "none",
           audioMuted: false,
           cameraEnabled: true,
+          screenSharing: false,
         }));
         break;
     }
@@ -336,27 +373,39 @@ export default function Home() {
 
   function startPeer(peerId: string, initiator: boolean) {
     const { name, gender, location } = resolvePeer(peerId);
-    const ps = new PeerSession(initiator, {
-      onSignal: (type: DescType, payload: string) => {
-        void sendSignal(sessionId, peerId, type, payload);
+    const ps = new PeerSession(
+      initiator,
+      {
+        onSignal: (type: DescType, payload: string) => {
+          void sendSignal(sessionId, peerId, type, payload);
+        },
+        onChat: (text, nonce) => addMessage(peerId, false, text, nonce),
+        onReaction: (nonce, emoji) => addReaction(peerId, nonce, emoji, false),
+        onUnreaction: (nonce, emoji) =>
+          removeReaction(peerId, nonce, emoji, false),
+        onControl: (ctrl) => handleControl(peerId, ctrl),
+        onTyping: () => handlePeerTyping(peerId),
+        onRemoteStream: (stream) => {
+          updateSession(peerId, (s) => ({ ...s, remoteStream: stream }));
+        },
+        onConnectionState: (state) => {
+          if (state === "failed") {
+            teardown(peerId, "Connection failed (network).");
+          }
+        },
+        onChannelOpen: () => {
+          updateSession(peerId, (s) => ({ ...s, conn: "connected" }));
+        },
+        onScreenShareEnded: () => {
+          updateSession(peerId, (s) => ({
+            ...s,
+            screenSharing: false,
+            localStream: ps.getLocalStream(),
+          }));
+        },
       },
-      onChat: (text, nonce) => addMessage(peerId, false, text, nonce),
-      onReaction: (nonce, emoji) => addReaction(peerId, nonce, emoji, false),
-      onUnreaction: (nonce, emoji) =>
-        removeReaction(peerId, nonce, emoji, false),
-      onControl: (ctrl) => handleControl(peerId, ctrl),
-      onRemoteStream: (stream) => {
-        updateSession(peerId, (s) => ({ ...s, remoteStream: stream }));
-      },
-      onConnectionState: (state) => {
-        if (state === "failed") {
-          teardown(peerId, "Connection failed (network).");
-        }
-      },
-      onChannelOpen: () => {
-        updateSession(peerId, (s) => ({ ...s, conn: "connected" }));
-      },
-    });
+      iceServersRef.current,
+    );
 
     const newSession: ChatSession = {
       peerId,
@@ -372,6 +421,8 @@ export default function Home() {
       remoteStream: null,
       audioMuted: false,
       cameraEnabled: true,
+      screenSharing: false,
+      isTyping: false,
     };
 
     setSessions((prev) => {
@@ -526,7 +577,37 @@ export default function Home() {
       video: "none",
       audioMuted: false,
       cameraEnabled: true,
+      screenSharing: false,
     }));
+  }
+
+  function startScreenShare(peerId: string) {
+    const session = sessionsRef.current.get(peerId);
+    if (!session || session.video !== "active") return;
+    session.peer
+      .startScreenShare()
+      .then((stream) => {
+        updateSession(peerId, (s) => ({
+          ...s,
+          localStream: stream,
+          screenSharing: true,
+        }));
+      })
+      .catch(() => {
+        showNotice("Screen sharing unavailable.");
+      });
+  }
+
+  function stopScreenShare(peerId: string) {
+    const session = sessionsRef.current.get(peerId);
+    if (!session) return;
+    void session.peer.stopScreenShare().then(() => {
+      updateSession(peerId, (s) => ({
+        ...s,
+        localStream: session.peer.getLocalStream(),
+        screenSharing: false,
+      }));
+    });
   }
 
   function toggleVideoMute(peerId: string) {
@@ -597,6 +678,7 @@ export default function Home() {
         }
         if (incomingPeerIdRef.current === sig.fromId) {
           setIncomingPeerId(null);
+          showNotice("Request expired.");
         }
         if (sessionsRef.current.has(sig.fromId)) {
           const session = sessionsRef.current.get(sig.fromId);
@@ -646,15 +728,32 @@ export default function Home() {
     if (phase !== "live" || !sessionId) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let consecutiveFailures = 0;
 
     const tick = async () => {
       try {
         const data = await poll(sessionId);
         if (!active) return;
+        consecutiveFailures = 0;
+        setConnectionStatus("online");
         setPeers(data.peers);
         for (const s of data.signals) processSignalRef.current(s);
-      } catch {}
-      if (active) timer = setTimeout(tick, POLL_INTERVAL_MS);
+      } catch {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 3) {
+          setConnectionStatus("reconnecting");
+        }
+      }
+      if (active) {
+        const delay =
+          consecutiveFailures >= 3
+            ? Math.min(
+                POLL_INTERVAL_MS * 2 ** (consecutiveFailures - 3),
+                10_000,
+              )
+            : POLL_INTERVAL_MS;
+        timer = setTimeout(tick, delay);
+      }
     };
     tick();
 
@@ -663,6 +762,12 @@ export default function Home() {
       if (timer) clearTimeout(timer);
     };
   }, [phase, sessionId]);
+
+  useEffect(() => {
+    if (phase !== "live") return;
+    const inVideo = [...sessions.values()].some((s) => s.video === "active");
+    void setBusy(sessionId, inVideo).catch(() => {});
+  }, [sessions, phase, sessionId]);
 
   useEffect(() => {
     if (!sessionId || phase !== "live") return;
@@ -681,17 +786,32 @@ export default function Home() {
     name: string,
     gender: Gender,
     location: string,
+    mood: Mood,
   ) {
-    setMyLocation({ lat, lng });
     setMyName(name);
     setMyGender(gender);
     setMyLocationLabel(location);
-    await join(sessionId, lat, lng, name, gender, location);
+    iceServersRef.current = await getIceServers();
+    const offset = await join(
+      sessionId,
+      lat,
+      lng,
+      name,
+      gender,
+      location,
+      mood,
+    );
+    setMyLocation({ lat: offset.lat, lng: offset.lng });
     setPhase("live");
   }
 
   if (phase === "gate") {
-    return <EntryGate onReady={handleReady} />;
+    return (
+      <>
+        <CreatedByCredit />
+        <EntryGate onReady={handleReady} />
+      </>
+    );
   }
 
   const activeSession = activePeerId
@@ -714,6 +834,7 @@ export default function Home() {
 
   return (
     <main className="fixed inset-0 overflow-hidden">
+      {videoSession?.video !== "active" && <CreatedByCredit />}
       <WorldMap
         peers={filteredPeers}
         me={
@@ -733,6 +854,7 @@ export default function Home() {
               )}
               connected={activeSession.conn === "connected"}
               videoBusy={activeSession.video !== "none"}
+              isTyping={activeSession.isTyping}
               onSend={(text) => {
                 const nonce = crypto.randomUUID();
                 activeSession.peer.sendChat(text, nonce);
@@ -750,11 +872,27 @@ export default function Home() {
                   addReaction(activeSession.peerId, nonce, emoji, true);
                 }
               }}
+              onTyping={() => activeSession.peer.sendTyping()}
+              onReport={() =>
+                void reportPeer(sessionId, activeSession.peerId).catch(() =>
+                  showNotice("Couldn't submit report."),
+                )
+              }
               onStartVideo={() => startVideoRequest(activeSession.peerId)}
               onEnd={() => endConnection(activeSession.peerId)}
             />
           )}
           <ChatTabs tabs={chatTabs} onSelect={setActiveTab} />
+        </div>
+      )}
+
+      {connectionStatus === "reconnecting" && (
+        <div className="panel-glass animate-fade-up absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 text-sm text-[var(--text-primary)] shadow-xl">
+          <WifiOff
+            className="h-4 w-4 shrink-0 text-amber-400"
+            aria-hidden
+          />
+          Reconnecting…
         </div>
       )}
 
@@ -792,6 +930,7 @@ export default function Home() {
           )} wants to connect`}
           acceptLabel="Accept"
           declineLabel="Decline"
+          timeoutMs={REQUEST_TIMEOUT_MS}
           onAccept={acceptIncoming}
           onDecline={declineIncoming}
         />
@@ -839,8 +978,10 @@ export default function Home() {
           remoteStream={videoSession.remoteStream}
           audioMuted={videoSession.audioMuted}
           cameraEnabled={videoSession.cameraEnabled}
+          screenSharing={videoSession.screenSharing}
           messages={videoSession.messages}
           connected={videoSession.conn === "connected"}
+          isTyping={videoSession.isTyping}
           onSend={(text) => {
             const nonce = crypto.randomUUID();
             videoSession.peer.sendChat(text, nonce);
@@ -858,14 +999,18 @@ export default function Home() {
               addReaction(videoSession.peerId, nonce, emoji, true);
             }
           }}
+          onTyping={() => videoSession.peer.sendTyping()}
           onToggleMute={() => toggleVideoMute(videoSession.peerId)}
           onToggleCamera={() => toggleVideoCamera(videoSession.peerId)}
+          onStartScreenShare={() => startScreenShare(videoSession.peerId)}
+          onStopScreenShare={() => stopScreenShare(videoSession.peerId)}
           onEnd={() => endVideo(videoSession.peerId)}
         />
       )}
 
       {videoSession?.video !== "active" && !changelogOpen && (
         <BottomBar
+          compact={chatTabs.length > 0}
           onlineCount={peers.length}
           onChangelogOpen={() => setChangelogOpen(true)}
           genderFilter={genderFilter}

@@ -1,4 +1,12 @@
 // Shared types across client + API.
+import type { LucideIcon } from "lucide-react";
+import {
+  Gamepad2,
+  Globe,
+  MessageCircle,
+  Moon,
+  Palette,
+} from "lucide-react";
 
 // Signal mailbox message types.
 export type SignalType =
@@ -12,6 +20,20 @@ export type SignalType =
 
 export type Gender = "male" | "female" | "other";
 
+export const MOOD_OPTIONS: ReadonlyArray<{
+  value: string;
+  label: string;
+  lucideIcon: LucideIcon;
+}> = [
+  { value: "chatty", label: "Chatty", lucideIcon: MessageCircle },
+  { value: "exploring", label: "Exploring", lucideIcon: Globe },
+  { value: "gaming", label: "Gaming", lucideIcon: Gamepad2 },
+  { value: "creative", label: "Creative", lucideIcon: Palette },
+  { value: "bored", label: "Bored", lucideIcon: Moon },
+];
+
+export type Mood = (typeof MOOD_OPTIONS)[number]["value"] | "";
+
 export interface PeerDot {
   id: string;
   lat: number;
@@ -20,6 +42,7 @@ export interface PeerDot {
   name: string;
   gender: Gender;
   location: string;
+  mood: string;
 }
 
 export interface SignalMsg {

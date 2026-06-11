@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
       name: true,
       gender: true,
       location: true,
+      mood: true,
     },
   });
 
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
       name: p.name,
       gender: p.gender as Gender,
       location: p.location,
+      mood: p.mood,
     })),
     signals: inbox.map((s) => ({
       id: s.id,

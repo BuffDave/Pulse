@@ -18,7 +18,8 @@ model Presence {
   name     String   @default("")
   gender   String   @default("")
   location String   @default("") // e.g. "California, US" from reverse geocoding
-  busy     Boolean  @default(false) // true while in an active connection
+  mood     String   @default("") // optional vibe label shown on hover
+  busy     Boolean  @default(false) // true while in an active video call
   lastSeen DateTime
 
   @@index([lastSeen])
@@ -34,4 +35,14 @@ model Signal {
   createdAt DateTime @default(now())
 
   @@index([toId])
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  reporterId  String
+  reportedId  String
+  createdAt   DateTime @default(now())
+
+  @@index([reportedId])
+  @@index([createdAt])
 }

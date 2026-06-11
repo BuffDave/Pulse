@@ -2,6 +2,37 @@
 
 All notable changes to Pulse are documented here.
 
+## [1.5.0]
+
+### Added
+
+- **Cloudflare TURN**: `/api/ice` issues short-lived relay credentials when `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` are set; falls back to Google STUN otherwise.
+- **Mood on entry**: Optional mood picker on the entry gate (Lucide icons in a two-column card); mood is stored on presence and shown in map hover labels and tooltips.
+- **Typing indicators**: Peer typing state syncs over the WebRTC data channel; shown as *typing…* in the chat panel.
+- **Connection countdown**: Outgoing connection and video requests show an animated timeout bar on the prompt modal.
+- **Screen sharing**: Share your screen during a video call; remote video switches to the shared track and reverts when sharing ends.
+- **Report user**: Flag button in the chat header posts an anonymous report (`/api/report`) for moderation review.
+- **Rate limiting**: Middleware throttles `/api/join`, `/api/signal`, and `/api/report` per IP (in-memory; Redis noted for multi-instance production).
+- **Video busy API**: `/api/busy` lets clients set `busy` while in an active video call so peers see accurate availability.
+- **Reconnect banner**: Poll failures trigger exponential backoff and a top-of-screen *Reconnecting…* notice; join and signal calls surface HTTP errors instead of failing silently.
+- **PWA**: Web app manifest, theme colors, and generated 192/512 icons for add-to-home-screen.
+- **Privacy warning**: Empty chat state reminds users not to share phone numbers, addresses, passwords, or other private info.
+- **Created-by credit**: Footer credit on the map view, hidden during an active video call.
+
+### Changed
+
+- **Your map pin**: Client uses the privacy-offset coordinates returned by `/api/join` so your dot matches the server-stored position.
+- **Entry gate layout**: Name and gender on the left, mood grid on the right; mood buttons use Lucide icons instead of emoji.
+- **Bottom bar (mobile)**: When a chat is open, viewports below 1260px show a bottom-left burger menu (changelog, online count, gender filter) instead of the full pill bar.
+- **Chat tabs**: Active tab shows a white gender icon and white peer name instead of a colored dot.
+- **Map gender icons**: Badge icons use gender colors (blue / pink / gray) via shared `genderColor()` tokens.
+- **Reaction UI**: Message reaction chips and hover/compose emoji pickers styled in `globals.css` for consistent glass panels and accent highlights.
+- **Chat panel**: Safe-area padding for notched phones; report and typing UI integrated into the header and message list.
+
+### Fixed
+
+- **Me-pin offset drift**: Joining no longer leaves your pin at raw GPS while peers see the offset position — both sides now use the same offset coords from the join response.
+
 ## [1.4.0]
 
 ### Added

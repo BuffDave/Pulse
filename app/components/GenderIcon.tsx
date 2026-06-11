@@ -1,3 +1,4 @@
+import { genderColor } from "@/lib/peerDisplay";
 import type { Gender } from "@/lib/types";
 
 const ICONS: Record<Gender | "default", string> = {
@@ -17,7 +18,11 @@ function iconInner(gender: string): string {
 }
 
 export function genderIconHtml(gender: string, size = 14): string {
-  return `<svg class="pulse-gender-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" aria-hidden="true">${iconInner(gender)}</svg>`;
+  const color =
+    gender === "male" || gender === "female" || gender === "other"
+      ? genderColor(gender)
+      : "#a1a1aa";
+  return `<svg class="pulse-gender-icon" style="color:${color}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" aria-hidden="true">${iconInner(gender)}</svg>`;
 }
 
 function MaleIcon() {

@@ -6,9 +6,11 @@ import { createPortal } from "react-dom";
 import type { EmojiClickData } from "emoji-picker-react";
 import { EmojiStyle, Theme } from "emoji-picker-react";
 import {
+  Flag,
   MessageCircle,
   PhoneOff,
   SendHorizonal,
+  ShieldAlert,
   Smile,
   Video,
 } from "lucide-react";
@@ -65,9 +67,12 @@ export default function ChatPanel({
   peerName,
   connected,
   videoBusy,
+  isTyping = false,
   embedded = false,
   onSend,
   onReact,
+  onTyping,
+  onReport,
   onStartVideo,
   onEnd,
 }: {
@@ -75,15 +80,19 @@ export default function ChatPanel({
   peerName: string;
   connected: boolean;
   videoBusy: boolean;
+  isTyping?: boolean;
   embedded?: boolean;
   onSend: (text: string) => void;
   onReact: (nonce: string, emoji: string) => void;
+  onTyping?: () => void;
+  onReport?: () => void;
   onStartVideo: () => void;
   onEnd: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [reported, setReported] = useState(false);
   const [reactionAnchor, setReactionAnchor] = useState<ReactionAnchor | null>(
     null,
   );
@@ -92,6 +101,7 @@ export default function ChatPanel({
   const pickerRef = useRef<HTMLDivElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
   const reactionLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -100,7 +110,7 @@ export default function ChatPanel({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isTyping]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -152,6 +162,16 @@ export default function ChatPanel({
     }
   }
 
+  function handleDraftChange(value: string) {
+    setDraft(value);
+    if (!connected || !onTyping || !value.trim()) return;
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      onTyping();
+      typingTimer.current = null;
+    }, 400);
+  }
+
   function onEmojiClick(data: EmojiClickData) {
     setDraft((d) => d + data.emoji);
     setPickerOpen(false);
@@ -181,6 +201,12 @@ export default function ChatPanel({
     setReactionAnchor({ nonce, rect: el.getBoundingClientRect(), mine });
   }
 
+  function handleReport() {
+    if (reported || !onReport) return;
+    onReport();
+    setReported(true);
+  }
+
   const showReactionAbove =
     reactionAnchor !== null && reactionAnchor.rect.top > 56;
 
@@ -189,14 +215,14 @@ export default function ChatPanel({
       className={
         embedded
           ? "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] portrait:max-w-none landscape:max-w-md landscape:shrink-0"
-          : "animate-slide-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-base)]/92 text-[var(--text-primary)] shadow-2xl"
+          : "animate-slide-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-base)]/92 pt-12 text-[var(--text-primary)] shadow-2xl md:pt-0"
       }
     >
       {!embedded && (
         <header className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/80 px-4 py-3 backdrop-blur-md">
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="text-base font-semibold">{peerName}</p>
+              <p className="truncate text-base font-semibold">{peerName}</p>
               <span
                 className={`h-2 w-2 shrink-0 rounded-full ${connected ? "bg-[var(--accent)]" : "animate-pulse bg-amber-400"}`}
                 aria-hidden
@@ -206,21 +232,32 @@ export default function ChatPanel({
               {connected ? "Connected" : "Connecting…"}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex shrink-0 gap-2">
+            {onReport && (
+              <button
+                type="button"
+                onClick={handleReport}
+                disabled={reported}
+                aria-label={reported ? "Reported" : "Report user"}
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[var(--border-default)] text-[var(--text-secondary)] transition duration-200 hover:border-white/20 hover:bg-white/5 hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Flag className="h-4 w-4" aria-hidden />
+              </button>
+            )}
             <button
               onClick={onStartVideo}
               disabled={!connected || videoBusy}
               className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border-default)] px-3 py-1.5 text-sm transition duration-200 hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Video className="h-4 w-4" aria-hidden />
-              Video
+              <span className="hidden sm:inline">Video</span>
             </button>
             <button
               onClick={onEnd}
               className="flex cursor-pointer items-center gap-1.5 rounded-full bg-red-500 px-3 py-1.5 text-sm font-medium text-white transition duration-200 hover:bg-red-400"
             >
               <PhoneOff className="h-4 w-4" aria-hidden />
-              End
+              <span className="hidden sm:inline">End</span>
             </button>
           </div>
         </header>
@@ -235,6 +272,16 @@ export default function ChatPanel({
             />
             <p className="max-w-[14rem] text-sm text-[var(--text-secondary)]">
               Say hello. Messages are peer-to-peer and never stored.
+            </p>
+            <p className="flex max-w-[16rem] items-start gap-2 text-left text-xs text-[var(--text-muted)]">
+              <ShieldAlert
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400"
+                aria-hidden
+              />
+              <span>
+                Don&apos;t share private info — phone numbers, addresses,
+                passwords, or anything that could identify you.
+              </span>
             </p>
           </div>
         )}
@@ -265,9 +312,7 @@ export default function ChatPanel({
               </div>
               {reactionGroups.size > 0 && (
                 <div
-                  className={`mt-1 flex flex-wrap gap-1 ${
-                    m.mine ? "justify-end" : "justify-start"
-                  }`}
+                  className={`pulse-reaction-chips ${m.mine ? "pulse-reaction-chips--mine" : ""}`}
                 >
                   {[...reactionGroups.entries()].map(
                     ([emoji, { count, hasMine }]) =>
@@ -276,23 +321,20 @@ export default function ChatPanel({
                           key={emoji}
                           type="button"
                           onClick={() => onReact(m.nonce, emoji)}
-                          className="inline-flex cursor-pointer items-center gap-0.5 rounded-full border border-[var(--accent)]/60 bg-[var(--accent-glow)] px-2 py-0.5 text-xs transition duration-200 hover:bg-[var(--accent)]/20"
+                          className="pulse-reaction-chip pulse-reaction-chip--mine"
                         >
                           <span>{emoji}</span>
                           {count > 1 && (
-                            <span className="text-[var(--text-secondary)]">
+                            <span className="pulse-reaction-chip__count">
                               {count}
                             </span>
                           )}
                         </button>
                       ) : (
-                        <span
-                          key={emoji}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-0.5 text-xs"
-                        >
+                        <span key={emoji} className="pulse-reaction-chip">
                           <span>{emoji}</span>
                           {count > 1 && (
-                            <span className="text-[var(--text-secondary)]">
+                            <span className="pulse-reaction-chip__count">
                               {count}
                             </span>
                           )}
@@ -304,6 +346,9 @@ export default function ChatPanel({
             </div>
           );
         })}
+        {isTyping && (
+          <p className="text-xs italic text-[var(--text-secondary)]">typing…</p>
+        )}
         <div ref={endRef} />
       </div>
 
@@ -313,7 +358,7 @@ export default function ChatPanel({
         createPortal(
           <div
             ref={reactionPickerRef}
-            className="fixed z-[9999]"
+            className="pulse-reaction-panel fixed z-[9999]"
             onMouseEnter={cancelReactionClose}
             onMouseLeave={scheduleReactionClose}
             style={{
@@ -335,6 +380,7 @@ export default function ChatPanel({
           >
             <EmojiPicker
               {...PICKER_PROPS}
+              className="pulse-reaction-picker"
               reactionsDefaultOpen
               allowExpandReactions={false}
               reactions={REACTION_EMOJIS}
@@ -348,14 +394,18 @@ export default function ChatPanel({
 
       <form
         onSubmit={submit}
-        className="relative flex items-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3"
+        className="sticky bottom-0 flex items-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       >
         {pickerOpen && (
           <div
             ref={pickerRef}
-            className="absolute bottom-full left-0 z-50 mb-2 max-w-[min(100vw-2rem,320px)]"
+            className="pulse-emoji-picker-wrap absolute bottom-full left-0 z-50 mb-2"
           >
-            <EmojiPicker {...PICKER_PROPS} onEmojiClick={onEmojiClick} />
+            <EmojiPicker
+              {...PICKER_PROPS}
+              className="pulse-emoji-picker"
+              onEmojiClick={onEmojiClick}
+            />
           </div>
         )}
         <button
@@ -370,7 +420,7 @@ export default function ChatPanel({
         <textarea
           ref={inputRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => handleDraftChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={connected ? "Type a message…" : "Connecting…"}
           disabled={!connected}

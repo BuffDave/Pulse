@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Monitor, MonitorOff } from "lucide-react";
 import ChatPanel, { type ChatMessage } from "./ChatPanel";
 
 function MicIcon({ muted }: { muted: boolean }) {
@@ -63,12 +63,17 @@ export default function VideoPanel({
   remoteStream,
   audioMuted,
   cameraEnabled,
+  screenSharing,
   messages,
   connected,
+  isTyping,
   onSend,
   onReact,
+  onTyping,
   onToggleMute,
   onToggleCamera,
+  onStartScreenShare,
+  onStopScreenShare,
   onEnd,
 }: {
   peerName: string;
@@ -76,12 +81,17 @@ export default function VideoPanel({
   remoteStream: MediaStream | null;
   audioMuted: boolean;
   cameraEnabled: boolean;
+  screenSharing: boolean;
   messages: ChatMessage[];
   connected: boolean;
+  isTyping?: boolean;
   onSend: (text: string) => void;
   onReact: (nonce: string, emoji: string) => void;
+  onTyping?: () => void;
   onToggleMute: () => void;
   onToggleCamera: () => void;
+  onStartScreenShare: () => void;
+  onStopScreenShare: () => void;
   onEnd: () => void;
 }) {
   const localRef = useRef<HTMLVideoElement>(null);
@@ -100,7 +110,7 @@ export default function VideoPanel({
   }, [remoteStream]);
 
   return (
-    <div className="absolute inset-0 z-30 flex min-h-0 justify-center bg-black">
+    <div className="absolute inset-0 z-30 flex min-h-0 justify-center bg-black pt-[env(safe-area-inset-top)]">
       <div className="flex min-h-0 w-full max-w-[1340px] flex-col gap-4 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] landscape:flex-row">
         <div className="flex min-h-0 min-w-0 flex-col gap-4 landscape:min-h-0 landscape:flex-1">
           <div className="relative aspect-[9/16] w-full shrink-0 overflow-hidden rounded-2xl bg-[var(--bg-surface)] landscape:aspect-auto landscape:min-h-0 landscape:flex-1">
@@ -134,11 +144,16 @@ export default function VideoPanel({
                 muted
                 className="block h-auto max-h-[min(32vh,14rem)] w-auto max-w-[min(32vw,12rem)] rounded-2xl object-contain ring-2 ring-white/20"
               />
-              {!cameraEnabled && (
+              {!cameraEnabled && !screenSharing && (
                 <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/80">
                   <span className="text-xs font-medium text-[var(--text-secondary)]">
                     Camera off
                   </span>
+                </div>
+              )}
+              {screenSharing && (
+                <div className="absolute left-1 top-1 rounded bg-[var(--accent)]/90 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--bg-base)]">
+                  Sharing
                 </div>
               )}
               {audioMuted && (
@@ -167,16 +182,35 @@ export default function VideoPanel({
               <button
                 type="button"
                 onClick={onToggleCamera}
+                disabled={screenSharing}
                 aria-label={
                   cameraEnabled ? "Turn camera off" : "Turn camera on"
                 }
-                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition duration-200 ${
+                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${
                   !cameraEnabled
                     ? "bg-red-500 text-white hover:bg-red-400"
                     : "bg-white/10 text-white hover:bg-white/15"
                 }`}
               >
                 <CameraIcon off={!cameraEnabled} />
+              </button>
+              <button
+                type="button"
+                onClick={screenSharing ? onStopScreenShare : onStartScreenShare}
+                aria-label={
+                  screenSharing ? "Stop screen sharing" : "Share screen"
+                }
+                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition duration-200 ${
+                  screenSharing
+                    ? "bg-[var(--accent)] text-[var(--bg-base)] hover:brightness-110"
+                    : "bg-white/10 text-white hover:bg-white/15"
+                }`}
+              >
+                {screenSharing ? (
+                  <MonitorOff className="h-5 w-5" aria-hidden />
+                ) : (
+                  <Monitor className="h-5 w-5" aria-hidden />
+                )}
               </button>
               <button
                 type="button"
@@ -195,9 +229,11 @@ export default function VideoPanel({
           peerName={peerName}
           connected={connected}
           videoBusy={true}
+          isTyping={isTyping}
           embedded={true}
           onSend={onSend}
           onReact={onReact}
+          onTyping={onTyping}
           onStartVideo={() => {}}
           onEnd={() => {}}
         />

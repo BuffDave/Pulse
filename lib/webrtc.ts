@@ -12,14 +12,23 @@ interface PeerCallbacks {
   onReaction: (nonce: string, emoji: string) => void;
   onUnreaction: (nonce: string, emoji: string) => void;
   onControl: (ctrl: PeerControl) => void;
+  onTyping: () => void;
   onRemoteStream: (stream: MediaStream | null) => void;
   onConnectionState: (state: RTCPeerConnectionState) => void;
   onChannelOpen: () => void;
+  onScreenShareEnded: () => void;
 }
 
-const ICE_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-};
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+];
+
+function buildIceConfig(iceServers?: RTCIceServer[]): RTCConfiguration {
+  return {
+    iceServers:
+      iceServers && iceServers.length > 0 ? iceServers : DEFAULT_ICE_SERVERS,
+  };
+}
 
 export class PeerSession {
   private pc: RTCPeerConnection;
@@ -28,14 +37,19 @@ export class PeerSession {
   private makingOffer = false;
   private ignoreOffer = false;
   private localStream: MediaStream | null = null;
+  private screenStream: MediaStream | null = null;
   private closed = false;
   private readonly cb: PeerCallbacks;
   private pendingCandidates: RTCIceCandidateInit[] = [];
 
-  constructor(initiator: boolean, cb: PeerCallbacks) {
+  constructor(
+    initiator: boolean,
+    cb: PeerCallbacks,
+    iceServers?: RTCIceServer[],
+  ) {
     this.cb = cb;
     this.polite = !initiator;
-    this.pc = new RTCPeerConnection(ICE_CONFIG);
+    this.pc = new RTCPeerConnection(buildIceConfig(iceServers));
 
     this.pc.onicecandidate = ({ candidate }) => {
       if (candidate) {
@@ -99,6 +113,8 @@ export class PeerSession {
           this.cb.onUnreaction(msg.nonce, msg.emoji);
         } else if (msg.t === "ctrl" && typeof msg.ctrl === "string") {
           this.cb.onControl(msg.ctrl as PeerControl);
+        } else if (msg.t === "typing") {
+          this.cb.onTyping();
         }
       } catch {}
     };
@@ -163,10 +179,20 @@ export class PeerSession {
     this.safeSend({ t: "ctrl", ctrl });
   }
 
+  sendTyping() {
+    this.safeSend({ t: "typing" });
+  }
+
   private safeSend(obj: unknown) {
     if (this.dc && this.dc.readyState === "open") {
       this.dc.send(JSON.stringify(obj));
     }
+  }
+
+  private getVideoSender(): RTCRtpSender | undefined {
+    return this.pc
+      .getSenders()
+      .find((sender) => sender.track?.kind === "video");
   }
 
   async startVideo(): Promise<MediaStream> {
@@ -182,6 +208,57 @@ export class PeerSession {
     return this.localStream;
   }
 
+  async startScreenShare(): Promise<MediaStream> {
+    if (this.screenStream) return this.screenStream;
+
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+    });
+    const screenTrack = screenStream.getVideoTracks()[0];
+    if (!screenTrack) {
+      screenStream.getTracks().forEach((t) => t.stop());
+      throw new Error("No screen video track");
+    }
+
+    screenTrack.onended = () => {
+      void this.stopScreenShare();
+      this.cb.onScreenShareEnded();
+    };
+
+    const sender = this.getVideoSender();
+    if (sender) {
+      await sender.replaceTrack(screenTrack);
+    } else {
+      this.pc.addTrack(screenTrack, screenStream);
+    }
+
+    this.screenStream = screenStream;
+    return screenStream;
+  }
+
+  async stopScreenShare(): Promise<void> {
+    if (!this.screenStream) return;
+
+    const screenTrack = this.screenStream.getVideoTracks()[0];
+    screenTrack?.stop();
+    this.screenStream = null;
+
+    const cameraTrack = this.localStream?.getVideoTracks()[0] ?? null;
+    const sender = this.getVideoSender();
+    if (sender) {
+      await sender.replaceTrack(cameraTrack);
+    }
+  }
+
+  isScreenSharing(): boolean {
+    return this.screenStream !== null;
+  }
+
+  getLocalStream(): MediaStream | null {
+    return this.screenStream ?? this.localStream;
+  }
+
   setAudioMuted(muted: boolean) {
     this.localStream?.getAudioTracks().forEach((t) => {
       t.enabled = !muted;
@@ -189,12 +266,17 @@ export class PeerSession {
   }
 
   setCameraEnabled(enabled: boolean) {
+    if (this.screenStream) return;
     this.localStream?.getVideoTracks().forEach((t) => {
       t.enabled = enabled;
     });
   }
 
   stopVideo() {
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach((t) => t.stop());
+      this.screenStream = null;
+    }
     if (this.localStream) {
       for (const track of this.localStream.getTracks()) track.stop();
       for (const sender of this.pc.getSenders()) {

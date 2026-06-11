@@ -5,6 +5,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Map as MapboxMap, Marker } from "mapbox-gl";
 import type { Gender, PeerDot } from "@/lib/types";
 import { genderIconHtml } from "@/app/components/GenderIcon";
+import { moodDisplay } from "@/lib/moodDisplay";
 import { genderColor, peerDisplayName } from "@/lib/peerDisplay";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -18,8 +19,9 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function peerLabelHtml(name: string, gender: Gender): string {
-  return `<span class="pulse-dot-label">${genderIconHtml(gender)} ${escapeHtml(peerDisplayName(name))}</span>`;
+function peerLabelHtml(name: string, gender: Gender, mood = ""): string {
+  const moodSuffix = mood ? ` · ${escapeHtml(moodDisplay(mood))}` : "";
+  return `<span class="pulse-dot-label">${genderIconHtml(gender)} ${escapeHtml(peerDisplayName(name))}${moodSuffix}</span>`;
 }
 
 function mePinHtml(): string {
@@ -141,8 +143,11 @@ export default function WorldMap({
           const el = document.createElement("button");
           el.className = "pulse-dot";
           el.style.color = genderColor(peer.gender);
-          el.title = `Tap to connect with ${peerDisplayName(peer.name)}`;
-          el.innerHTML = peerLabelHtml(peer.name, peer.gender);
+          const moodLabel = moodDisplay(peer.mood);
+          el.title = moodLabel
+            ? `Tap to connect with ${peerDisplayName(peer.name)} (${moodLabel})`
+            : `Tap to connect with ${peerDisplayName(peer.name)}`;
+          el.innerHTML = peerLabelHtml(peer.name, peer.gender, peer.mood);
           el.addEventListener("click", (e) => {
             e.stopPropagation();
             onPeerClickRef.current(peer.id);
@@ -154,8 +159,11 @@ export default function WorldMap({
         } else {
           const el = marker.getElement();
           el.style.color = genderColor(peer.gender);
-          el.title = `Tap to connect with ${peerDisplayName(peer.name)}`;
-          el.innerHTML = peerLabelHtml(peer.name, peer.gender);
+          const moodLabel = moodDisplay(peer.mood);
+          el.title = moodLabel
+            ? `Tap to connect with ${peerDisplayName(peer.name)} (${moodLabel})`
+            : `Tap to connect with ${peerDisplayName(peer.name)}`;
+          el.innerHTML = peerLabelHtml(peer.name, peer.gender, peer.mood);
         }
         marker.getElement().style.opacity = peer.busy ? "0.35" : "1";
       }

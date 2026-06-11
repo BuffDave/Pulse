@@ -1,13 +1,18 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { applyPrivacyOffset, isValidLatLng } from "@/lib/geo";
+import { MOOD_OPTIONS } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const VALID_GENDERS = new Set(["male", "female", "other"]);
+const VALID_MOODS = new Set<string>([
+  "",
+  ...MOOD_OPTIONS.map((m) => m.value),
+]);
 
-// POST /api/join — body { id, lat, lng, name, gender } (raw coords).
+// POST /api/join — body { id, lat, lng, name, gender, mood? } (raw coords).
 // Applies a 1–3 km privacy offset and upserts the presence row. Raw
 // coordinates are never stored.
 export async function POST(request: NextRequest) {
@@ -18,7 +23,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const { id, lat, lng, name, gender, location } = (body ?? {}) as Record<
+  const { id, lat, lng, name, gender, location, mood } = (body ?? {}) as Record<
     string,
     unknown
   >;
@@ -37,6 +42,11 @@ export async function POST(request: NextRequest) {
   }
   const trimmedLocation =
     typeof location === "string" ? location.trim().slice(0, 100) : "";
+  const trimmedMood =
+    typeof mood === "string" ? mood.trim().slice(0, 20) : "";
+  if (!VALID_MOODS.has(trimmedMood)) {
+    return Response.json({ error: "invalid mood" }, { status: 400 });
+  }
 
   const offset = applyPrivacyOffset(lat as number, lng as number);
   const trimmedName = name.trim();
@@ -50,6 +60,7 @@ export async function POST(request: NextRequest) {
       name: trimmedName,
       gender,
       location: trimmedLocation,
+      mood: trimmedMood,
       busy: false,
       lastSeen: new Date(),
     },
@@ -59,10 +70,11 @@ export async function POST(request: NextRequest) {
       name: trimmedName,
       gender,
       location: trimmedLocation,
+      mood: trimmedMood,
       lastSeen: new Date(),
       busy: false,
     },
   });
 
-  return Response.json({ ok: true });
+  return Response.json({ ok: true, lat: offset.lat, lng: offset.lng });
 }

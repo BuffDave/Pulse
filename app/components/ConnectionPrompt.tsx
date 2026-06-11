@@ -9,6 +9,7 @@ export default function ConnectionPrompt({
   acceptLabel,
   declineLabel,
   icon: Icon = UserPlus,
+  timeoutMs,
   onAccept,
   onDecline,
 }: {
@@ -17,6 +18,7 @@ export default function ConnectionPrompt({
   acceptLabel: string;
   declineLabel: string;
   icon?: LucideIcon;
+  timeoutMs?: number;
   onAccept: () => void;
   onDecline: () => void;
 }) {
@@ -34,6 +36,14 @@ export default function ConnectionPrompt({
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
             {subtitle}
           </p>
+        )}
+        {timeoutMs !== undefined && timeoutMs > 0 && (
+          <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="prompt-timeout-bar h-full rounded-full bg-[var(--accent)]"
+              style={{ animationDuration: `${timeoutMs}ms` }}
+            />
+          </div>
         )}
         <div className="mt-6 flex gap-3">
           <button
