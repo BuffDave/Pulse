@@ -10,12 +10,18 @@ import ChatPanel, { type ChatMessage } from "./components/ChatPanel";
 import ChatTabs from "./components/ChatTabs";
 import VideoPanel from "./components/VideoPanel";
 import BottomBar, { type GenderFilter } from "./components/BottomBar";
+import MegaphoneBar from "./components/MegaphoneBar";
+import ActivityFeed, {
+  type ActivityFeedItem,
+} from "./components/ActivityFeed";
 import ChangelogPanel from "./components/ChangelogPanel";
 import changelogContent from "../CHANGELOG.md";
 import {
+  clearBroadcast,
   getIceServers,
   join,
   leave,
+  megaphone,
   poll,
   reportPeer,
   sendSignal,
@@ -57,6 +63,7 @@ interface ChatSession {
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const BROADCAST_DISPLAY_MS = 5_000;
 
 function cloneSessions(map: Map<string, ChatSession>) {
   return new Map(map);
@@ -71,6 +78,7 @@ export default function Home() {
   );
   const [activePeerId, setActivePeerId] = useState<string | null>(null);
   const [incomingPeerId, setIncomingPeerId] = useState<string | null>(null);
+  const [incomingReceivedAt, setIncomingReceivedAt] = useState(0);
   const [requestingPeerId, setRequestingPeerId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [myLocation, setMyLocation] = useState<{
@@ -85,8 +93,11 @@ export default function Home() {
   const [connectionStatus, setConnectionStatus] = useState<
     "online" | "reconnecting"
   >("online");
+  const [broadcastItems, setBroadcastItems] = useState<ActivityFeedItem[]>([]);
+  const [myBroadcastText, setMyBroadcastText] = useState("");
 
   const sessionsRef = useRef(sessions);
+  const prevBroadcastRef = useRef<Map<string, string>>(new Map());
   const iceServersRef = useRef<RTCIceServer[]>([]);
   const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
@@ -124,6 +135,53 @@ export default function Home() {
   function showNotice(text: string) {
     setNotice(text);
     window.setTimeout(() => setNotice(null), 3500);
+  }
+
+  function pushBroadcastItem(item: ActivityFeedItem) {
+    setBroadcastItems((prev) => [item, ...prev].slice(0, 5));
+  }
+
+  function processBroadcasts(newPeers: PeerDot[]) {
+    const now = Date.now();
+    const newItems: ActivityFeedItem[] = [];
+
+    for (const peer of newPeers) {
+      if (!peer.broadcastText) {
+        prevBroadcastRef.current.set(peer.id, "");
+        continue;
+      }
+      const prev = prevBroadcastRef.current.get(peer.id) ?? "";
+      if (peer.broadcastText !== prev) {
+        prevBroadcastRef.current.set(peer.id, peer.broadcastText);
+        newItems.push({
+          id: `${peer.id}-${now}`,
+          name: peer.name,
+          text: peer.broadcastText,
+          addedAt: now,
+        });
+      }
+    }
+
+    if (newItems.length > 0) {
+      setBroadcastItems((prev) => [...newItems, ...prev].slice(0, 5));
+    }
+  }
+
+  async function handleBroadcast(text: string) {
+    await megaphone(sessionId, text);
+    const now = Date.now();
+    setMyBroadcastText(text);
+    pushBroadcastItem({
+      id: `${sessionId}-${now}`,
+      name: myName,
+      text,
+      addedAt: now,
+    });
+  }
+
+  async function handleClearBroadcast() {
+    await clearBroadcast(sessionId);
+    setMyBroadcastText("");
   }
 
   function handlePeerTyping(peerId: string) {
@@ -473,6 +531,7 @@ export default function Home() {
     const peerId = incomingPeerIdRef.current;
     if (!peerId) return;
     setIncomingPeerId(null);
+    setIncomingReceivedAt(0);
     startPeer(peerId, false);
     void sendSignal(sessionId, peerId, "accept");
   }
@@ -482,6 +541,7 @@ export default function Home() {
     if (!peerId) return;
     void sendSignal(sessionId, peerId, "decline");
     setIncomingPeerId(null);
+    setIncomingReceivedAt(0);
   }
 
   function endConnection(peerId: string) {
@@ -641,6 +701,7 @@ export default function Home() {
           break;
         }
         setIncomingPeerId(sig.fromId);
+        setIncomingReceivedAt(new Date(sig.createdAt).getTime());
         break;
       }
       case "accept": {
@@ -678,6 +739,7 @@ export default function Home() {
         }
         if (incomingPeerIdRef.current === sig.fromId) {
           setIncomingPeerId(null);
+          setIncomingReceivedAt(0);
           showNotice("Request expired.");
         }
         if (sessionsRef.current.has(sig.fromId)) {
@@ -725,6 +787,17 @@ export default function Home() {
   }, [peers]);
 
   useEffect(() => {
+    if (phase !== "live") return;
+    const interval = window.setInterval(() => {
+      const cutoff = Date.now() - BROADCAST_DISPLAY_MS;
+      setBroadcastItems((prev) =>
+        prev.filter((item) => item.addedAt >= cutoff),
+      );
+    }, 500);
+    return () => window.clearInterval(interval);
+  }, [phase]);
+
+  useEffect(() => {
     if (phase !== "live" || !sessionId) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -736,6 +809,8 @@ export default function Home() {
         if (!active) return;
         consecutiveFailures = 0;
         setConnectionStatus("online");
+        processBroadcasts(data.peers);
+        setMyBroadcastText(data.myBroadcastText);
         setPeers(data.peers);
         for (const s of data.signals) processSignalRef.current(s);
       } catch {
@@ -840,8 +915,33 @@ export default function Home() {
         me={
           myLocation ? { ...myLocation, name: myName, gender: myGender } : null
         }
+        myBroadcastText={myBroadcastText}
         onPeerClick={requestConnection}
       />
+
+      {videoSession?.video !== "active" && (
+        <MegaphoneBar
+          activeBroadcast={myBroadcastText}
+          onBroadcast={async (text) => {
+            try {
+              await handleBroadcast(text);
+            } catch {
+              showNotice("Couldn't send broadcast.");
+              throw new Error("broadcast failed");
+            }
+          }}
+          onClear={async () => {
+            try {
+              await handleClearBroadcast();
+            } catch {
+              showNotice("Couldn't delete broadcast.");
+              throw new Error("clear broadcast failed");
+            }
+          }}
+        />
+      )}
+
+      <ActivityFeed items={broadcastItems} />
 
       {chatTabs.length > 0 && (
         <div className="absolute inset-y-0 right-0 z-20 w-full max-w-md">
@@ -924,6 +1024,7 @@ export default function Home() {
 
       {incomingPeerId && (
         <ConnectionPrompt
+          key={incomingPeerId}
           title={`${formatPeerLabel(
             resolvePeer(incomingPeerId).name,
             resolvePeer(incomingPeerId).location,
@@ -931,6 +1032,7 @@ export default function Home() {
           acceptLabel="Accept"
           declineLabel="Decline"
           timeoutMs={REQUEST_TIMEOUT_MS}
+          receivedAt={incomingReceivedAt}
           onAccept={acceptIncoming}
           onDecline={declineIncoming}
         />
@@ -958,6 +1060,7 @@ export default function Home() {
 
       {videoSession?.video === "incoming" && (
         <ConnectionPrompt
+          audioVariant="video"
           title="Start video call?"
           subtitle={`${formatPeerLabel(videoSession.peerName, videoSession.peerLocation)} wants to start a video call.`}
           acceptLabel="Accept"

@@ -18,9 +18,11 @@ model Presence {
   name     String   @default("")
   gender   String   @default("")
   location String   @default("") // e.g. "California, US" from reverse geocoding
-  mood     String   @default("") // optional vibe label shown on hover
-  busy     Boolean  @default(false) // true while in an active video call
-  lastSeen DateTime
+  mood          String    @default("") // optional vibe label shown on hover
+  busy          Boolean   @default(false) // true while in an active video call
+  broadcastText String    @default("") // ephemeral megaphone message
+  broadcastAt   DateTime? // when broadcastText was last set
+  lastSeen      DateTime
 
   @@index([lastSeen])
 }

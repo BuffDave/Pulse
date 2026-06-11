@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
       gender: true,
       location: true,
       mood: true,
+      broadcastText: true,
+      broadcastAt: true,
     },
   });
 
@@ -62,7 +64,13 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  const self = await prisma.presence.findUnique({
+    where: { id },
+    select: { broadcastText: true },
+  });
+
   const response: PollResponse = {
+    myBroadcastText: self?.broadcastText ?? "",
     peers: peers.map((p) => ({
       id: p.id,
       lat: p.lat,
@@ -72,6 +80,7 @@ export async function GET(request: NextRequest) {
       gender: p.gender as Gender,
       location: p.location,
       mood: p.mood,
+      broadcastText: p.broadcastText,
     })),
     signals: inbox.map((s) => ({
       id: s.id,

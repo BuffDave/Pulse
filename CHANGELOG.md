@@ -2,6 +2,28 @@
 
 All notable changes to Pulse are documented here.
 
+## [1.6.0]
+
+### Added
+
+- **Megaphone**: Top-center collapsible bar to broadcast a short message (up to 100 characters) to everyone on the map; one active broadcast per user until deleted.
+- **Map broadcast badges**: Active broadcasts appear as accent pills above peer dots (and your pin); on hover, the name/gender/mood label slides in below the broadcast.
+- **Megaphone activity feed**: Center-left stack of the latest broadcast notifications with slide-in and fade-out; plays a distinct notification ding when a new message arrives.
+- **Megaphone API**: `POST` and `DELETE` `/api/megaphone` with one-at-a-time enforcement; poll returns `broadcastText` on peers and `myBroadcastText` for the caller.
+- **Connection prompt sounds**: Ascending sine ping on incoming chat requests, repeating every 3s until accept, decline, or timeout.
+- **Video call prompt sound**: Double-pulse ring tone (distinct from chat requests) on incoming video call prompts.
+- **Broadcast notification sound**: Single 880 Hz ding in the activity feed when a peer broadcasts (separate from connection sounds).
+
+### Changed
+
+- **Connection prompt timer**: Countdown reflects time elapsed since the request was sent (including while the tab is in the background); progress bar driven by `requestAnimationFrame` for smooth shrinking.
+- **Activity feed layout**: Multiple broadcasts stack vertically with subtle depth instead of overlapping.
+- **Hovered map markers**: Broadcast and name badges rise above neighboring dots via marker `z-index`; slightly increased gap between broadcast and name pills on hover.
+
+### Fixed
+
+- **Connection timer after tab switch**: Returning to a backgrounded tab no longer resets the timeout bar to full — elapsed time is preserved from the signal `createdAt` timestamp.
+
 ## [1.5.0]
 
 ### Added

@@ -43,6 +43,7 @@ export interface PeerDot {
   gender: Gender;
   location: string;
   mood: string;
+  broadcastText: string;
 }
 
 export interface SignalMsg {
@@ -57,4 +58,5 @@ export interface SignalMsg {
 export interface PollResponse {
   peers: PeerDot[];
   signals: SignalMsg[];
+  myBroadcastText: string;
 }

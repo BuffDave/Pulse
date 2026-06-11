@@ -89,6 +89,24 @@ export async function reportPeer(
   await assertOk(res, "report");
 }
 
+export async function megaphone(id: string, text: string): Promise<void> {
+  const res = await fetch("/api/megaphone", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, text }),
+  });
+  await assertOk(res, "megaphone");
+}
+
+export async function clearBroadcast(id: string): Promise<void> {
+  const res = await fetch("/api/megaphone", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  await assertOk(res, "clearBroadcast");
+}
+
 // Fire-and-forget leave that survives the tab closing.
 export function leave(id: string): void {
   const body = JSON.stringify({ id });

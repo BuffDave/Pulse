@@ -24,6 +24,20 @@ function peerLabelHtml(name: string, gender: Gender, mood = ""): string {
   return `<span class="pulse-dot-label">${genderIconHtml(gender)} ${escapeHtml(peerDisplayName(name))}${moodSuffix}</span>`;
 }
 
+function broadcastBadgeHtml(text: string): string {
+  return `<span class="pulse-broadcast-badge">${escapeHtml(text)}</span>`;
+}
+
+function markerBadgesHtml(
+  broadcastText: string,
+  name: string,
+  gender: Gender,
+  mood = "",
+): string {
+  const label = peerLabelHtml(name, gender, mood);
+  return broadcastText ? broadcastBadgeHtml(broadcastText) + label : label;
+}
+
 function mePinHtml(): string {
   return `<span class="pulse-me-pin" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z" fill="currentColor" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/><circle cx="12" cy="10" r="2.5" fill="var(--bg-base)"/></svg></span>`;
 }
@@ -31,10 +45,12 @@ function mePinHtml(): string {
 export default function WorldMap({
   peers,
   me,
+  myBroadcastText = "",
   onPeerClick,
 }: {
   peers: PeerDot[];
   me: { lat: number; lng: number; name: string; gender: Gender } | null;
+  myBroadcastText?: string;
   onPeerClick: (id: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -97,12 +113,12 @@ export default function WorldMap({
     (async () => {
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled) return;
-      const label = peerLabelHtml("Me", me.gender);
+      const badges = markerBadgesHtml(myBroadcastText, "Me", me.gender);
       if (!meMarkerRef.current) {
         const el = document.createElement("div");
         el.className = "pulse-me";
         el.title = "You are here";
-        el.innerHTML = `${label}${mePinHtml()}`;
+        el.innerHTML = `${badges}${mePinHtml()}`;
         // anchor "bottom" → the pin's tip sits on the exact coordinate.
         meMarkerRef.current = new mapboxgl.Marker({
           element: el,
@@ -112,17 +128,16 @@ export default function WorldMap({
           .addTo(map);
       } else {
         meMarkerRef.current.setLngLat([me.lng, me.lat]);
-        const labelEl = meMarkerRef.current
-          .getElement()
-          .querySelector(".pulse-dot-label");
-        if (labelEl) labelEl.outerHTML = label;
+        const el = meMarkerRef.current.getElement();
+        const pin = el.querySelector(".pulse-me-pin");
+        el.innerHTML = `${badges}${pin ? pin.outerHTML : mePinHtml()}`;
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [me, ready]);
+  }, [me, myBroadcastText, ready]);
 
   // Reconcile markers whenever the peer list changes (or the map becomes ready).
   useEffect(() => {
@@ -147,7 +162,12 @@ export default function WorldMap({
           el.title = moodLabel
             ? `Tap to connect with ${peerDisplayName(peer.name)} (${moodLabel})`
             : `Tap to connect with ${peerDisplayName(peer.name)}`;
-          el.innerHTML = peerLabelHtml(peer.name, peer.gender, peer.mood);
+          el.innerHTML = markerBadgesHtml(
+            peer.broadcastText,
+            peer.name,
+            peer.gender,
+            peer.mood,
+          );
           el.addEventListener("click", (e) => {
             e.stopPropagation();
             onPeerClickRef.current(peer.id);
@@ -163,7 +183,12 @@ export default function WorldMap({
           el.title = moodLabel
             ? `Tap to connect with ${peerDisplayName(peer.name)} (${moodLabel})`
             : `Tap to connect with ${peerDisplayName(peer.name)}`;
-          el.innerHTML = peerLabelHtml(peer.name, peer.gender, peer.mood);
+          el.innerHTML = markerBadgesHtml(
+            peer.broadcastText,
+            peer.name,
+            peer.gender,
+            peer.mood,
+          );
         }
         marker.getElement().style.opacity = peer.busy ? "0.35" : "1";
       }
