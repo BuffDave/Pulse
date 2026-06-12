@@ -2,6 +2,35 @@
 
 All notable changes to Pulse are documented here.
 
+## [1.8.0]
+
+### Added
+
+- **Session token auth**: Each presence row stores a proof-of-possession `token` (rotated on join); all mutating API routes verify `X-Session-Token` or poll `token` query param before acting on a session ID.
+- **Health check**: `GET /api/health` probes Postgres for uptime monitors and load balancers.
+- **Error boundaries**: `app/error.tsx` and `app/global-error.tsx` catch runtime failures with a reload affordance.
+- **Upstash rate limiting**: `proxy.ts` uses `@upstash/ratelimit` when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set; in-memory fallback remains for local dev.
+- **Privacy offset note**: Dismissible toast above the bottom bar explains that your pin is placed 1–3 km from your real location.
+- **Chat minimize**: Sidebar strip (`w-12`) with expand/collapse toggle; minimized view shows compact peer tabs (gender icon + unread badge) inline.
+- **Kindness note**: Empty chat state adds a “be kind” reminder alongside the existing PII shield warning.
+
+### Changed
+
+- **Content-Security-Policy**: Full CSP replaces `X-Frame-Options`; allows Mapbox, Cloudflare TURN, and WebRTC media sources.
+- **Poll performance**: Peer list, inbox drain, and self-broadcast reads run in parallel; old reports are reaped after 30 days.
+- **Signal indexes**: `@@index([fromId])` and `@@index([createdAt])` on `Signal` for faster cleanup and mailbox queries.
+- **Chat overlay**: Panel wrapper raised to `z-40` and widened to `max-w-lg`; `CreatedByCredit` lowered to `z-30`.
+- **Bottom bar breakpoint**: Burger menu when chat is open is phone-only (`sm` / 640px); tablet and up keep the full centered bar.
+- **WebRTC teardown copy**: `disconnected` state shows “{name} disconnected.”; `failed` shows a network error message.
+- **API error handling**: Join, poll, signal, leave, busy, report, and megaphone routes wrap handlers in try/catch with consistent 500 responses.
+- **Leave beacon**: `navigator.sendBeacon` sends JSON `Content-Type` blob and includes session token in the body.
+- **`.env.example`**: Documents `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+
+### Fixed
+
+- **Incoming connection timer**: Progress bar elapsed time uses `Date.now()` on receipt instead of the server `createdAt` timestamp, avoiding clock-skew resets.
+- **Privacy note layout**: When chat is minimized on mobile, the toast uses a fixed max width and stays clear of the sidebar strip.
+
 ## [1.7.0]
 
 ### Added

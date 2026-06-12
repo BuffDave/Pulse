@@ -1,7 +1,19 @@
 import type { NextConfig } from "next";
 
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self' blob: 'unsafe-inline' 'unsafe-eval'",
+  "worker-src blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://*.mapbox.com",
+  "connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://api.tiles.mapbox.com https://rtc.live.cloudflare.com wss://*.cloudflare.com",
+  "font-src 'self' data:",
+  "media-src blob: mediastream:",
+  "frame-ancestors 'none'",
+].join("; ");
+
 const securityHeaders = [
-  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {

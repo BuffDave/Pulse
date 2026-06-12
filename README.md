@@ -36,7 +36,6 @@ A living globe of anonymous strangers. Every online user appears as a dot on a w
    ```
 
 2. Copy `.env.example` to `.env` and fill in:
-
    - `DATABASE_URL` — a Postgres connection string ([Neon](https://neon.tech) works well)
    - `NEXT_PUBLIC_MAPBOX_TOKEN` — a [Mapbox access token](https://account.mapbox.com/access-tokens/)
    - `NEXT_PUBLIC_MAPBOX_STYLE` — optional Mapbox style URL (defaults to the project's custom style if unset)
@@ -80,12 +79,12 @@ Browser A  ←—— WebRTC (chat + video + reactions) ——→  Browser B
               (signals: connection + WebRTC mailbox)
 ```
 
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /api/join` | Register presence with privacy-offset coordinates, name, gender, and location label |
-| `GET /api/poll` | Heartbeat, peer list, signal drain |
-| `POST /api/signal` | WebRTC signaling mailbox |
-| `POST /api/leave` | Remove presence on tab close |
+| Endpoint           | Purpose                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| `POST /api/join`   | Register presence with privacy-offset coordinates, name, gender, and location label |
+| `GET /api/poll`    | Heartbeat, peer list, signal drain                                                  |
+| `POST /api/signal` | WebRTC signaling mailbox                                                            |
+| `POST /api/leave`  | Remove presence on tab close                                                        |
 
 ## Deployment
 

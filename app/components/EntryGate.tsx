@@ -27,9 +27,9 @@ export default function EntryGate({
   const [name, setName] = useState("");
   const [gender, setGender] = useState<Gender | null>(null);
   const [mood, setMood] = useState<Mood>("");
-  const [status, setStatus] = useState<"idle" | "locating" | "joining" | "error">(
-    "idle",
-  );
+  const [status, setStatus] = useState<
+    "idle" | "locating" | "joining" | "error"
+  >("idle");
   const [error, setError] = useState<string>("");
 
   const canEnter = name.trim().length > 0 && gender !== null;
@@ -151,7 +151,8 @@ export default function EntryGate({
             {/* Right column: mood */}
             <div className="flex flex-col gap-2 md:border-l md:border-[var(--border-subtle)] md:pl-8">
               <span className="text-sm font-medium text-[var(--text-secondary)]">
-                Mood <span className="text-[var(--text-muted)]">(optional)</span>
+                Mood{" "}
+                <span className="text-[var(--text-muted)]">(optional)</span>
               </span>
               <div className="grid grid-cols-2 gap-2">
                 {MOOD_OPTIONS.map((opt) => {

@@ -2,7 +2,15 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Info, Loader2, UserPlus, Video, WifiOff } from "lucide-react";
+import {
+  Info,
+  Loader2,
+  ShieldCheck,
+  UserPlus,
+  Video,
+  WifiOff,
+  X,
+} from "lucide-react";
 import CreatedByCredit from "./components/CreatedByCredit";
 import EntryGate from "./components/EntryGate";
 
@@ -96,6 +104,8 @@ export default function Home() {
   >("online");
   const [broadcastItems, setBroadcastItems] = useState<ActivityFeedItem[]>([]);
   const [myBroadcastText, setMyBroadcastText] = useState("");
+  const [showPrivacyNote, setShowPrivacyNote] = useState(true);
+  const [chatMinimized, setChatMinimized] = useState(false);
 
   const sessionsRef = useRef(sessions);
   const prevBroadcastRef = useRef<Map<string, string>>(new Map());
@@ -450,8 +460,10 @@ export default function Home() {
           updateSession(peerId, (s) => ({ ...s, remoteStream: stream }));
         },
         onConnectionState: (state) => {
-          if (state === "failed") {
-            teardown(peerId, "Connection failed (network).");
+          if (state === "disconnected") {
+            teardown(peerId, `${peerDisplayName(name)} disconnected.`);
+          } else if (state === "failed") {
+            teardown(peerId, "Connection failed (network error).");
           }
         },
         onChannelOpen: () => {
@@ -704,7 +716,7 @@ export default function Home() {
           break;
         }
         setIncomingPeerId(sig.fromId);
-        setIncomingReceivedAt(new Date(sig.createdAt).getTime());
+        setIncomingReceivedAt(Date.now());
         break;
       }
       case "accept": {
@@ -947,7 +959,11 @@ export default function Home() {
       <ActivityFeed items={broadcastItems} />
 
       {chatTabs.length > 0 && (
-        <div className="absolute inset-y-0 right-0 z-20 w-full max-w-md">
+        <div
+          className={`absolute inset-y-0 right-0 z-40 transition-[width] duration-300 ease-in-out ${
+            chatMinimized ? "w-12" : "w-full max-w-lg"
+          }`}
+        >
           {activeSession && (
             <ChatPanel
               messages={activeSession.messages}
@@ -958,6 +974,10 @@ export default function Home() {
               connected={activeSession.conn === "connected"}
               videoBusy={activeSession.video !== "none"}
               isTyping={activeSession.isTyping}
+              minimized={chatMinimized}
+              onToggleMinimize={() => setChatMinimized((m) => !m)}
+              tabs={chatTabs}
+              onTabSelect={setActiveTab}
               onSend={(text) => {
                 const nonce = crypto.randomUUID();
                 activeSession.peer.sendChat(text, nonce);
@@ -985,7 +1005,34 @@ export default function Home() {
               onEnd={() => endConnection(activeSession.peerId)}
             />
           )}
-          <ChatTabs tabs={chatTabs} onSelect={setActiveTab} />
+          {!chatMinimized && <ChatTabs tabs={chatTabs} onSelect={setActiveTab} />}
+        </div>
+      )}
+
+      {showPrivacyNote && (
+        <div
+          className={`panel-glass animate-fade-up pointer-events-auto fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-30 flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs text-[var(--text-secondary)] shadow-xl sm:bottom-[calc(7.25rem+env(safe-area-inset-bottom))] ${
+            chatTabs.length > 0 && chatMinimized
+              ? "left-4 w-[min(calc(100vw-5rem),22rem)] translate-x-0 sm:left-1/2 sm:w-[min(100vw-1.5rem,22rem)] sm:-translate-x-1/2"
+              : "left-1/2 w-[min(100vw-1.5rem,22rem)] -translate-x-1/2"
+          }`}
+          role="status"
+        >
+          <ShieldCheck
+            className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]"
+            aria-hidden
+          />
+          <span>
+            Your pin is placed 1–3&nbsp;km from your real location for privacy.
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowPrivacyNote(false)}
+            aria-label="Dismiss privacy note"
+            className="ml-1 shrink-0 cursor-pointer rounded p-0.5 text-[var(--text-muted)] transition duration-200 hover:text-[var(--text-primary)]"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </button>
         </div>
       )}
 

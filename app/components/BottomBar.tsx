@@ -29,7 +29,7 @@ export default function BottomBar({
   onChangelogOpen: () => void;
   genderFilter: GenderFilter;
   onGenderFilterChange: (filter: GenderFilter) => void;
-  /** When true (chat open), mobile/tablet shows a bottom-left burger instead of the bar. */
+  /** When true (chat open), mobile shows a bottom-left burger instead of the bar. */
   compact?: boolean;
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -70,7 +70,7 @@ export default function BottomBar({
   const bar = (
     <div
       ref={barRef}
-      className={`pointer-events-auto relative ${compact ? "hidden min-[1260px]:block" : ""}`}
+      className={`pointer-events-auto relative ${compact ? "hidden sm:block" : ""}`}
     >
       {dropdownOpen && (
         <div
@@ -144,7 +144,10 @@ export default function BottomBar({
   );
 
   const burger = compact ? (
-    <div ref={burgerRef} className="pointer-events-auto relative min-[1260px]:hidden">
+    <div
+      ref={burgerRef}
+      className="pointer-events-auto relative sm:hidden"
+    >
       {burgerOpen && (
         <div className="panel-glass animate-fade-up absolute bottom-full left-0 z-50 mb-2 min-w-[11rem] overflow-hidden rounded-xl py-1 shadow-xl">
           <button

@@ -7,13 +7,19 @@ import type { EmojiClickData } from "emoji-picker-react";
 import { EmojiStyle, Theme } from "emoji-picker-react";
 import {
   Flag,
+  Heart,
   MessageCircle,
+  PanelRightClose,
+  PanelRightOpen,
   PhoneOff,
   SendHorizonal,
   ShieldAlert,
   Smile,
   Video,
 } from "lucide-react";
+import GenderIcon from "@/app/components/GenderIcon";
+import { peerDisplayName } from "@/lib/peerDisplay";
+import type { ChatTab } from "@/app/components/ChatTabs";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -69,6 +75,10 @@ export default function ChatPanel({
   videoBusy,
   isTyping = false,
   embedded = false,
+  minimized = false,
+  onToggleMinimize,
+  tabs,
+  onTabSelect,
   onSend,
   onReact,
   onTyping,
@@ -82,6 +92,10 @@ export default function ChatPanel({
   videoBusy: boolean;
   isTyping?: boolean;
   embedded?: boolean;
+  minimized?: boolean;
+  onToggleMinimize?: () => void;
+  tabs?: ChatTab[];
+  onTabSelect?: (peerId: string) => void;
   onSend: (text: string) => void;
   onReact: (nonce: string, emoji: string) => void;
   onTyping?: () => void;
@@ -210,27 +224,82 @@ export default function ChatPanel({
   const showReactionAbove =
     reactionAnchor !== null && reactionAnchor.rect.top > 56;
 
+  const panelClass = embedded
+    ? "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] portrait:max-w-none landscape:max-w-lg landscape:shrink-0"
+    : minimized
+      ? "animate-slide-right absolute inset-y-0 right-0 flex w-12 flex-col items-center border-l border-[var(--border-subtle)] bg-[var(--bg-base)]/92 text-[var(--text-primary)] shadow-2xl"
+      : "animate-slide-right absolute inset-y-0 right-0 flex w-full max-w-lg flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-base)]/92 pt-12 text-[var(--text-primary)] shadow-2xl md:pt-0";
+
   return (
-    <div
-      className={
-        embedded
-          ? "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] portrait:max-w-none landscape:max-w-md landscape:shrink-0"
-          : "animate-slide-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-base)]/92 pt-12 text-[var(--text-primary)] shadow-2xl md:pt-0"
-      }
-    >
+    <div className={panelClass}>
+      {!embedded && minimized ? (
+        <div className="flex flex-1 flex-col items-center gap-3 overflow-hidden pt-4">
+          {onToggleMinimize && (
+            <button
+              type="button"
+              onClick={onToggleMinimize}
+              aria-label="Open chat"
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--border-default)] text-[var(--text-secondary)] transition duration-200 hover:border-white/20 hover:bg-white/5 hover:text-[var(--text-primary)]"
+            >
+              <PanelRightOpen className="h-4 w-4" aria-hidden />
+            </button>
+          )}
+          {tabs && tabs.length > 0 ? (
+            <div className="flex w-full flex-col items-center gap-2 overflow-y-auto">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.peerId}
+                  type="button"
+                  onClick={() => onTabSelect?.(tab.peerId)}
+                  aria-label={peerDisplayName(tab.peerName)}
+                  className={`relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border transition duration-200 ${
+                    tab.active
+                      ? "border-[var(--accent)]/50 bg-[var(--accent)]/10 text-[var(--accent)]"
+                      : "border-[var(--border-default)] text-[var(--text-secondary)] hover:border-white/20 hover:bg-white/5 hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <GenderIcon gender={tab.peerGender} size="sm" />
+                  {tab.unread > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold leading-none text-white">
+                      {tab.unread > 9 ? "9+" : tab.unread}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="max-h-[min(40vh,12rem)] truncate text-xs font-medium text-[var(--text-secondary)] [writing-mode:vertical-rl] rotate-180">
+              {peerName}
+            </span>
+          )}
+        </div>
+      ) : (
+        <>
       {!embedded && (
         <header className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/80 px-4 py-3 backdrop-blur-md">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="truncate text-base font-semibold">{peerName}</p>
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${connected ? "bg-[var(--accent)]" : "animate-pulse bg-amber-400"}`}
-                aria-hidden
-              />
+          <div className="flex min-w-0 items-center gap-3">
+            {onToggleMinimize && (
+              <button
+                type="button"
+                onClick={onToggleMinimize}
+                aria-label="Minimize chat"
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--border-default)] text-[var(--text-secondary)] transition duration-200 hover:border-white/20 hover:bg-white/5 hover:text-[var(--text-primary)]"
+              >
+                <PanelRightClose className="h-4 w-4" aria-hidden />
+              </button>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-base font-semibold">{peerName}</p>
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${connected ? "bg-[var(--accent)]" : "animate-pulse bg-amber-400"}`}
+                  aria-hidden
+                />
+              </div>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {connected ? "Connected" : "Connecting…"}
+              </p>
             </div>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {connected ? "Connected" : "Connecting…"}
-            </p>
           </div>
           <div className="flex shrink-0 gap-2">
             {onReport && (
@@ -274,8 +343,17 @@ export default function ChatPanel({
               Say hello. Messages are peer-to-peer and never stored.
             </p>
             <p className="flex max-w-[16rem] items-start gap-2 text-left text-xs text-[var(--text-muted)]">
+              <Heart
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent)]"
+                aria-hidden
+              />
+              <span>
+                Be kind — let&apos;s keep this a positive space for everyone.
+              </span>
+            </p>
+            <p className="flex max-w-[16rem] items-start gap-2 text-left text-xs text-[var(--text-muted)]">
               <ShieldAlert
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent)]"
                 aria-hidden
               />
               <span>
@@ -353,6 +431,7 @@ export default function ChatPanel({
       </div>
 
       {isMounted &&
+        !minimized &&
         reactionAnchor &&
         connected &&
         createPortal(
@@ -436,6 +515,8 @@ export default function ChatPanel({
           <SendHorizonal className="h-4 w-4" aria-hidden />
         </button>
       </form>
+        </>
+      )}
     </div>
   );
 }

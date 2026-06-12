@@ -13,6 +13,7 @@ datasource db {
 
 model Presence {
   id       String   @id // client-generated session uuid
+  token    String   @default(uuid()) // proof-of-possession secret; rotated on join
   lat      Float // ALREADY privacy-offset coords (raw is never stored)
   lng      Float
   name     String   @default("")
@@ -37,6 +38,8 @@ model Signal {
   createdAt DateTime @default(now())
 
   @@index([toId])
+  @@index([fromId])
+  @@index([createdAt])
 }
 
 model Report {
