@@ -7,6 +7,9 @@ All notable changes to Pulse are documented here.
 ### Added
 
 - **In-call chat minimize**: Collapse embedded video-call chat to a portrait bottom bar or landscape side strip; expand to restore full chat. New messages and typing show a badge while minimized.
+- **Status toasts**: Shared `StatusToast` component for map notices and the privacy note — outer wrapper handles viewport width and safe-area; inner `panel-glass` padding unchanged.
+- **Mobile emoji picker layout**: `lib/emojiPickerLayout.ts` and `useEmojiPickerSize` for viewport-aware picker sizing and positioning.
+- **Screen-share detection**: `canScreenShare()` in `lib/mediaSupport.ts` gates the share button on unsupported devices.
 
 ### Changed
 
@@ -15,6 +18,19 @@ All notable changes to Pulse are documented here.
 - **Scrollbars**: App-wide dark thin scrollbars via `color-scheme: dark` and surface-matched tracks; fixes light/white gutters in in-call chat on Windows.
 - **Entry gate**: “Created by dave” badge no longer shown on the entry screen.
 - **Activity feed (mobile)**: Top-left compact cards, max 2 visible items, smaller text and padding so broadcasts use less map space.
+- **Mobile toasts**: Top banners use safe-area-aware placement, max viewport width, and text wrapping.
+- **Privacy note (mobile)**: Below `sm` (640px), recenters in the visible map area when chat is open; wider viewports stay viewport-centered.
+- **Bottom bar & megaphone**: Fully opaque `.panel-glass-dense` background for readability over the map.
+- **Overlay z-index**: Megaphone `z-50`; bottom bar `z-[55]` above privacy note; expanded chat and active video `z-[60]`; status toasts `z-[65]`; connection/changelog modals `z-[70]`.
+- **Emoji pickers**: Megaphone and chat compose pickers portal to `document.body`; mobile sizing uses `visualViewport`, safe-area clamping, and flip above/below when space is tight; preview row hidden on narrow screens.
+- **Screen share on mobile**: Share button hidden when `getDisplayMedia` is unavailable; clearer error notice when sharing fails.
+
+### Fixed
+
+- **Chat header spacing**: Guaranteed gap between the status dot and flag/action buttons on narrow viewports.
+- **Megaphone vs sidebar**: Megaphone and its emoji picker render above the minimized sidebar strip.
+- **Expanded chat layering**: Maximized chat panel stacks above the megaphone and privacy note; minimized strip stays below them.
+- **Emoji picker clipping**: Compose pickers no longer cut off inside chat panels or behind the sidebar.
 
 ## [1.9.0]
 

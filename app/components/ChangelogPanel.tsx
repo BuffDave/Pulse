@@ -15,7 +15,7 @@ export default function ChangelogPanel({
 
   return (
     <div
-      className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm"
+      className="absolute inset-0 z-[70] flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm"
       onClick={onClose}
     >
       <div

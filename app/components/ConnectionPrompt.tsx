@@ -119,7 +119,7 @@ export default function ConnectionPrompt({
   }, [audioVariant]);
 
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 p-6 backdrop-blur-md">
+    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/70 p-6 backdrop-blur-md">
       <div className="panel-glass animate-scale-in w-full max-w-xs rounded-3xl p-8 text-center text-[var(--text-primary)] shadow-2xl">
         <div
           className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent-glow)]"

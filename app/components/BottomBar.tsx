@@ -74,7 +74,7 @@ export default function BottomBar({
     >
       {dropdownOpen && (
         <div
-          className="panel-glass animate-fade-up absolute bottom-full right-0 z-50 mb-2 min-w-[9rem] overflow-hidden rounded-xl py-1 shadow-xl"
+          className="panel-glass panel-glass-dense animate-fade-up absolute bottom-full right-0 z-50 mb-2 min-w-[9rem] overflow-hidden rounded-xl py-1 shadow-xl"
           role="listbox"
         >
           {FILTER_OPTIONS.map((opt) => (
@@ -99,7 +99,7 @@ export default function BottomBar({
         </div>
       )}
 
-      <div className="panel-glass grid grid-cols-3 items-stretch overflow-hidden rounded-full shadow-xl">
+      <div className="panel-glass panel-glass-dense grid grid-cols-3 items-stretch overflow-hidden rounded-full shadow-xl">
         <button
           type="button"
           onClick={onChangelogOpen}
@@ -149,7 +149,7 @@ export default function BottomBar({
       className="pointer-events-auto relative sm:hidden"
     >
       {burgerOpen && (
-        <div className="panel-glass animate-fade-up absolute bottom-full left-0 z-50 mb-2 min-w-[11rem] overflow-hidden rounded-xl py-1 shadow-xl">
+        <div className="panel-glass panel-glass-dense animate-fade-up absolute bottom-full left-0 z-50 mb-2 min-w-[11rem] overflow-hidden rounded-xl py-1 shadow-xl">
           <button
             type="button"
             onClick={() => {
@@ -201,7 +201,7 @@ export default function BottomBar({
         onClick={() => setBurgerOpen((open) => !open)}
         aria-label={burgerOpen ? "Close menu" : "Open menu"}
         aria-expanded={burgerOpen}
-        className="panel-glass flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] shadow-xl transition duration-200 hover:text-[var(--text-primary)]"
+        className="panel-glass panel-glass-dense flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] shadow-xl transition duration-200 hover:text-[var(--text-primary)]"
       >
         {burgerOpen ? (
           <X className="h-5 w-5" aria-hidden />
@@ -214,12 +214,12 @@ export default function BottomBar({
 
   return (
     <>
-      <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 w-[min(100vw-1.5rem,22rem)] -translate-x-1/2 pb-[env(safe-area-inset-bottom)] sm:bottom-10 sm:w-auto">
+      <div className="pointer-events-none absolute bottom-6 left-1/2 z-[55] w-[min(100vw-1.5rem,22rem)] -translate-x-1/2 pb-[env(safe-area-inset-bottom)] sm:bottom-10 sm:w-auto">
         {bar}
       </div>
       {burger && (
         <div
-          className="pointer-events-none fixed bottom-6 left-4 z-30 pb-[env(safe-area-inset-bottom)] sm:bottom-10"
+          className="pointer-events-none fixed bottom-6 left-4 z-[55] pb-[env(safe-area-inset-bottom)] sm:bottom-10"
           style={{ left: "max(1rem, env(safe-area-inset-left))" }}
         >
           {burger}

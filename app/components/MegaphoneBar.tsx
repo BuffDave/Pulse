@@ -2,9 +2,15 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { EmojiClickData } from "emoji-picker-react";
 import { EmojiStyle, Theme } from "emoji-picker-react";
 import { Megaphone, Send, Smile, Trash2, X } from "lucide-react";
+import {
+  getPickerPortalStyle,
+  shouldShowEmojiPreview,
+} from "@/lib/emojiPickerLayout";
+import { useEmojiPickerSize } from "@/app/components/useEmojiPickerSize";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -32,11 +38,20 @@ export default function MegaphoneBar({
   const [sending, setSending] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const emojiBtnRef = useRef<HTMLButtonElement>(null);
 
   const hasActiveBroadcast = activeBroadcast.length > 0;
+  const pickerActive =
+    pickerOpen && expanded && !hasActiveBroadcast && pickerAnchor !== null;
+  const pickerSize = useEmojiPickerSize(pickerActive);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (expanded && !hasActiveBroadcast) {
@@ -49,11 +64,18 @@ export default function MegaphoneBar({
       setExpanded(false);
       setText("");
       setPickerOpen(false);
+      setPickerAnchor(null);
     }
   }, [hasActiveBroadcast]);
 
   useEffect(() => {
-    if (!pickerOpen) return;
+    if (!pickerOpen) {
+      setPickerAnchor(null);
+      return;
+    }
+    const rect = emojiBtnRef.current?.getBoundingClientRect();
+    if (rect) setPickerAnchor(rect);
+
     function onPointerDown(e: PointerEvent) {
       const target = e.target as Node;
       if (pickerRef.current?.contains(target)) return;
@@ -110,26 +132,14 @@ export default function MegaphoneBar({
   }
 
   return (
-    <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 pt-[env(safe-area-inset-top)]">
+    <div className="pointer-events-none absolute left-1/2 top-4 z-50 -translate-x-1/2 pt-[env(safe-area-inset-top)]">
       <div
-        className={`panel-glass pointer-events-auto relative flex items-center gap-2 overflow-visible rounded-full shadow-xl transition-all duration-300 ${
+        className={`panel-glass panel-glass-dense pointer-events-auto relative flex items-center gap-2 overflow-visible rounded-full shadow-xl transition-all duration-300 ${
           expanded && !hasActiveBroadcast
             ? "w-[min(100vw-2rem,22rem)] px-3 py-2"
             : "max-w-[min(100vw-2rem,22rem)] px-3 py-2.5"
         }`}
       >
-        {pickerOpen && expanded && !hasActiveBroadcast && (
-          <div
-            ref={pickerRef}
-            className="pulse-emoji-picker-wrap absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2"
-          >
-            <EmojiPicker
-              {...PICKER_PROPS}
-              className="pulse-emoji-picker"
-              onEmojiClick={onEmojiClick}
-            />
-          </div>
-        )}
         {hasActiveBroadcast ? (
           <>
             <Megaphone
@@ -212,6 +222,32 @@ export default function MegaphoneBar({
           </button>
         )}
       </div>
+
+      {isMounted &&
+        pickerActive &&
+        pickerAnchor &&
+        createPortal(
+          <div
+            ref={pickerRef}
+            className="pulse-emoji-picker-wrap fixed z-[9999]"
+            style={getPickerPortalStyle(pickerAnchor, pickerSize, {
+              preferBelow: true,
+              align: "center",
+            })}
+          >
+            <EmojiPicker
+              {...PICKER_PROPS}
+              className="pulse-emoji-picker"
+              width={pickerSize.width}
+              height={pickerSize.height}
+              previewConfig={{
+                showPreview: shouldShowEmojiPreview(pickerSize.width),
+              }}
+              onEmojiClick={onEmojiClick}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

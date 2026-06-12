@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Monitor, MonitorOff } from "lucide-react";
 import ChatPanel, { type ChatMessage } from "./ChatPanel";
+import { canScreenShare } from "@/lib/mediaSupport";
 
 function MicIcon({ muted }: { muted: boolean }) {
   return (
@@ -62,6 +63,7 @@ function CallControls({
   audioMuted,
   cameraEnabled,
   screenSharing,
+  screenShareSupported,
   onToggleMute,
   onToggleCamera,
   onStartScreenShare,
@@ -72,6 +74,7 @@ function CallControls({
   audioMuted: boolean;
   cameraEnabled: boolean;
   screenSharing: boolean;
+  screenShareSupported: boolean;
   onToggleMute: () => void;
   onToggleCamera: () => void;
   onStartScreenShare: () => void;
@@ -110,22 +113,24 @@ function CallControls({
       >
         <CameraIcon off={!cameraEnabled} />
       </button>
-      <button
-        type="button"
-        onClick={screenSharing ? onStopScreenShare : onStartScreenShare}
-        aria-label={screenSharing ? "Stop screen sharing" : "Share screen"}
-        className={`flex ${btn} cursor-pointer items-center justify-center rounded-full transition duration-200 ${
-          screenSharing
-            ? "bg-[var(--accent)] text-[var(--bg-base)] hover:brightness-110"
-            : "bg-white/10 text-white hover:bg-white/15"
-        }`}
-      >
-        {screenSharing ? (
-          <MonitorOff className="h-5 w-5" aria-hidden />
-        ) : (
-          <Monitor className="h-5 w-5" aria-hidden />
-        )}
-      </button>
+      {screenShareSupported && (
+        <button
+          type="button"
+          onClick={screenSharing ? onStopScreenShare : onStartScreenShare}
+          aria-label={screenSharing ? "Stop screen sharing" : "Share screen"}
+          className={`flex ${btn} cursor-pointer items-center justify-center rounded-full transition duration-200 ${
+            screenSharing
+              ? "bg-[var(--accent)] text-[var(--bg-base)] hover:brightness-110"
+              : "bg-white/10 text-white hover:bg-white/15"
+          }`}
+        >
+          {screenSharing ? (
+            <MonitorOff className="h-5 w-5" aria-hidden />
+          ) : (
+            <Monitor className="h-5 w-5" aria-hidden />
+          )}
+        </button>
+      )}
       <button
         type="button"
         onClick={onEnd}
@@ -191,10 +196,13 @@ export default function VideoPanel({
     }
   }, [remoteStream]);
 
+  const screenShareSupported = canScreenShare();
+
   const controlProps = {
     audioMuted,
     cameraEnabled,
     screenSharing,
+    screenShareSupported,
     onToggleMute,
     onToggleCamera,
     onStartScreenShare,
@@ -203,7 +211,7 @@ export default function VideoPanel({
   };
 
   return (
-    <div className="absolute inset-0 z-30 flex h-full min-h-0 justify-center overflow-hidden bg-black pt-[env(safe-area-inset-top)]">
+    <div className="absolute inset-0 z-[60] flex h-full min-h-0 justify-center overflow-hidden bg-black pt-[env(safe-area-inset-top)]">
       <div className="flex h-full min-h-0 w-full max-w-[1440px] flex-col gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] landscape:flex-row landscape:gap-4 landscape:p-4 landscape:pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div
           className={`flex min-h-0 min-w-0 flex-col landscape:min-h-0 landscape:flex-1 landscape:gap-4 ${

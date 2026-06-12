@@ -21,10 +21,10 @@ import ChatTabs from "./components/ChatTabs";
 import VideoPanel from "./components/VideoPanel";
 import BottomBar, { type GenderFilter } from "./components/BottomBar";
 import MegaphoneBar from "./components/MegaphoneBar";
-import ActivityFeed, {
-  type ActivityFeedItem,
-} from "./components/ActivityFeed";
+import ActivityFeed, { type ActivityFeedItem } from "./components/ActivityFeed";
 import ChangelogPanel from "./components/ChangelogPanel";
+import StatusToast from "./components/StatusToast";
+import { canScreenShare } from "@/lib/mediaSupport";
 import {
   clearBroadcast,
   getIceServers,
@@ -659,6 +659,10 @@ export default function Home() {
   function startScreenShare(peerId: string) {
     const session = sessionsRef.current.get(peerId);
     if (!session || session.video !== "active") return;
+    if (!canScreenShare()) {
+      showNotice("Screen sharing isn't supported on this device.");
+      return;
+    }
     session.peer
       .startScreenShare()
       .then((stream) => {
@@ -669,7 +673,7 @@ export default function Home() {
         }));
       })
       .catch(() => {
-        showNotice("Screen sharing unavailable.");
+        showNotice("Couldn't start screen sharing.");
       });
   }
 
@@ -957,8 +961,8 @@ export default function Home() {
 
       {showSidebarChat && (
         <div
-          className={`absolute inset-y-0 right-0 z-40 transition-[width] duration-300 ease-in-out ${
-            chatMinimized ? "w-12" : "w-full max-w-lg"
+          className={`absolute inset-y-0 right-0 transition-[width] duration-300 ease-in-out ${
+            chatMinimized ? "z-40 w-12" : "z-[60] w-full max-w-lg"
           }`}
         >
           {activeSession && (
@@ -1002,71 +1006,74 @@ export default function Home() {
               onEnd={() => endConnection(activeSession.peerId)}
             />
           )}
-          {!chatMinimized && <ChatTabs tabs={chatTabs} onSelect={setActiveTab} />}
+          {!chatMinimized && (
+            <ChatTabs tabs={chatTabs} onSelect={setActiveTab} />
+          )}
         </div>
       )}
 
       {showPrivacyNote && (
-        <div
-          className={`panel-glass animate-fade-up pointer-events-auto fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-30 flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs text-[var(--text-secondary)] shadow-xl sm:bottom-[calc(7.25rem+env(safe-area-inset-bottom))] ${
-            showSidebarChat && chatMinimized
-              ? "left-4 w-[min(calc(100vw-5rem),22rem)] translate-x-0 sm:left-1/2 sm:w-[min(100vw-1.5rem,22rem)] sm:-translate-x-1/2"
-              : "left-1/2 w-[min(100vw-1.5rem,22rem)] -translate-x-1/2"
-          }`}
+        <StatusToast
+          position="bottom"
+          width="22rem"
+          zIndex={50}
+          sidebarAware={
+            showSidebarChat
+              ? { show: true, minimized: chatMinimized }
+              : undefined
+          }
           role="status"
+          innerClassName="items-center gap-2 px-3 py-2.5 text-xs text-[var(--text-secondary)]"
         >
           <ShieldCheck
-            className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]"
+            className="h-4 w-4 shrink-0 text-[var(--accent)]"
             aria-hidden
           />
-          <span>
+          <span className="min-w-0 flex-1">
             Your pin is placed 1–3&nbsp;km from your real location for privacy.
           </span>
           <button
             type="button"
             onClick={() => setShowPrivacyNote(false)}
             aria-label="Dismiss privacy note"
-            className="ml-1 shrink-0 cursor-pointer rounded p-0.5 text-[var(--text-muted)] transition duration-200 hover:text-[var(--text-primary)]"
+            className="shrink-0 cursor-pointer rounded p-0.5 text-[var(--text-muted)] transition duration-200 hover:text-[var(--text-primary)]"
           >
             <X className="h-3.5 w-3.5" aria-hidden />
           </button>
-        </div>
+        </StatusToast>
       )}
 
       {connectionStatus === "reconnecting" && (
-        <div className="panel-glass animate-fade-up absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 text-sm text-[var(--text-primary)] shadow-xl">
-          <WifiOff
-            className="h-4 w-4 shrink-0 text-amber-400"
-            aria-hidden
-          />
+        <StatusToast position="top">
+          <WifiOff className="h-4 w-4 shrink-0 text-amber-400" aria-hidden />
           Reconnecting…
-        </div>
+        </StatusToast>
       )}
 
       {notice && (
-        <div className="panel-glass animate-fade-up absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 text-sm text-[var(--text-primary)] shadow-xl">
+        <StatusToast position="top">
           <Info className="h-4 w-4 shrink-0 text-[var(--accent)]" aria-hidden />
-          {notice}
-        </div>
+          <span className="min-w-0 flex-1">{notice}</span>
+        </StatusToast>
       )}
 
       {requestingPeerId && (
-        <div className="panel-glass animate-fade-up absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full px-4 py-2.5 text-sm text-[var(--text-primary)] shadow-xl">
+        <StatusToast position="top" innerClassName="gap-3">
           <UserPlus
             className="h-4 w-4 shrink-0 text-[var(--accent)]"
             aria-hidden
           />
-          <span>
+          <span className="min-w-0 flex-1">
             Requesting connection with{" "}
             {peerDisplayName(resolvePeer(requestingPeerId).name)}…
           </span>
           <button
             onClick={cancelRequest}
-            className="cursor-pointer rounded-full bg-white/10 px-3 py-1 text-xs transition duration-200 hover:bg-white/15"
+            className="shrink-0 cursor-pointer rounded-full bg-white/10 px-3 py-1 text-xs transition duration-200 hover:bg-white/15"
           >
             Cancel
           </button>
-        </div>
+        </StatusToast>
       )}
 
       {incomingPeerId && (
@@ -1086,23 +1093,23 @@ export default function Home() {
       )}
 
       {videoSession?.video === "requesting" && (
-        <div className="panel-glass animate-fade-up absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full px-4 py-2.5 text-sm text-[var(--text-primary)] shadow-xl">
+        <StatusToast position="top" innerClassName="gap-3">
           <Loader2
             className="h-4 w-4 shrink-0 animate-spin text-[var(--accent)]"
             aria-hidden
           />
-          <span>
+          <span className="min-w-0 flex-1">
             Waiting for{" "}
             {formatPeerLabel(videoSession.peerName, videoSession.peerLocation)}{" "}
             to accept video call…
           </span>
           <button
             onClick={() => cancelVideoRequest(videoSession.peerId)}
-            className="cursor-pointer rounded-full bg-white/10 px-3 py-1 text-xs transition duration-200 hover:bg-white/15"
+            className="shrink-0 cursor-pointer rounded-full bg-white/10 px-3 py-1 text-xs transition duration-200 hover:bg-white/15"
           >
             Cancel
           </button>
-        </div>
+        </StatusToast>
       )}
 
       {videoSession?.video === "incoming" && (
