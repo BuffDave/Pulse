@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import GenderIcon from "@/app/components/GenderIcon";
@@ -31,8 +32,10 @@ export default function EntryGate({
     "idle" | "locating" | "joining" | "error"
   >("idle");
   const [error, setError] = useState<string>("");
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
 
-  const canEnter = name.trim().length > 0 && gender !== null;
+  const canEnter =
+    name.trim().length > 0 && gender !== null && ageConfirmed;
 
   async function enter() {
     if (!canEnter || !gender) return;
@@ -125,6 +128,36 @@ export default function EntryGate({
                   ))}
                 </div>
               </div>
+
+              <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-[var(--text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={ageConfirmed}
+                  onChange={(e) => setAgeConfirmed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-[var(--border-default)] accent-[var(--accent)]"
+                />
+                <span>
+                  I confirm I am{" "}
+                  <strong className="font-semibold text-[var(--text-primary)]">
+                    18 or older
+                  </strong>{" "}
+                  and agree to the{" "}
+                  <Link
+                    href="/terms"
+                    className="text-[var(--accent)] transition duration-200 hover:brightness-110"
+                  >
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="/privacy"
+                    className="text-[var(--accent)] transition duration-200 hover:brightness-110"
+                  >
+                    Privacy Policy
+                  </Link>
+                  .
+                </span>
+              </label>
 
               <button
                 onClick={() => void enter()}

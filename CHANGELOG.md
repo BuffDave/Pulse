@@ -2,6 +2,22 @@
 
 All notable changes to Pulse are documented here.
 
+## [1.9.0]
+
+### Added
+
+- **Privacy Policy**: `/privacy` page with markdown content covering session data, peer-to-peer chat, third-party services, abuse reports, and contact email.
+- **Terms of Service**: `/terms` page with 18+ eligibility, acceptable use, disclaimers, and limitation of liability.
+- **18+ entry gate**: Required checkbox on the entry screen — users must confirm they are 18 or older and agree to the Terms and Privacy Policy before joining.
+- **Legal page layout**: Shared `LegalPage` component with glass styling, back link, and cross-links between Privacy and Terms.
+- **Legal SEO**: `buildPageMetadata()` helper adds per-page descriptions, canonical URLs, Open Graph, and Twitter cards for `/privacy` and `/terms`.
+- **Site constants**: `CONTACT_EMAIL`, `LEGAL_LAST_UPDATED`, `PRIVACY_DESCRIPTION`, and `TERMS_DESCRIPTION` in `lib/site.ts`.
+
+### Changed
+
+- **Sitemap**: `/privacy` and `/terms` included with `lastModified` from `LEGAL_LAST_UPDATED`.
+- **Legal headings**: Markdown `#` titles render as `h2` so each legal page has a single document `h1`.
+
 ## [1.8.0]
 
 ### Added
