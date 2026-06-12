@@ -13,6 +13,9 @@
   --text-muted: #44445a;
   --background: var(--bg-base);
   --foreground: var(--text-primary);
+  --scrollbar-thumb: #2a2a38;
+  --scrollbar-thumb-hover: #3a3a4a;
+  --scrollbar-size: 8px;
 }
 
 @theme inline {
@@ -23,6 +26,10 @@
   --color-elevated: var(--bg-elevated);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
@@ -426,32 +433,32 @@ body {
   line-height: 0;
 }
 
-.changelog-content,
-.epr-body {
+* {
   scrollbar-width: thin;
-  scrollbar-color: #2a2a38 var(--bg-base);
+  scrollbar-color: var(--scrollbar-thumb) var(--scroll-track, var(--bg-base));
 }
 
-.changelog-content::-webkit-scrollbar,
-.epr-body::-webkit-scrollbar {
-  width: 10px;
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
 }
 
-.changelog-content::-webkit-scrollbar-track,
-.epr-body::-webkit-scrollbar-track {
-  background: var(--bg-base);
+*::-webkit-scrollbar-track {
+  background: var(--scroll-track, var(--bg-base));
 }
 
-.changelog-content::-webkit-scrollbar-thumb,
-.epr-body::-webkit-scrollbar-thumb {
-  background: #2a2a38;
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
   border-radius: 9999px;
-  border: 2px solid var(--bg-base);
 }
 
-.changelog-content::-webkit-scrollbar-thumb:hover,
-.epr-body::-webkit-scrollbar-thumb:hover {
-  background: #3a3a4a;
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Chat panels sit on --bg-surface; match track so gutters are not light/white */
+.pulse-scroll-surface {
+  --scroll-track: var(--bg-surface);
 }
 
 @keyframes pulse-ring {

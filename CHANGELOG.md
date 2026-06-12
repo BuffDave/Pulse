@@ -2,6 +2,20 @@
 
 All notable changes to Pulse are documented here.
 
+## [1.10.0]
+
+### Added
+
+- **In-call chat minimize**: Collapse embedded video-call chat to a portrait bottom bar or landscape side strip; expand to restore full chat. New messages and typing show a badge while minimized.
+
+### Changed
+
+- **Video panel layout**: Max content width 1440px; portrait mobile uses a capped video area (~50dvh), overlaid controls, and a scrollable chat split below.
+- **In-call sidebar**: Sidebar chat hidden during active video calls (chat remains in the video panel).
+- **Scrollbars**: App-wide dark thin scrollbars via `color-scheme: dark` and surface-matched tracks; fixes light/white gutters in in-call chat on Windows.
+- **Entry gate**: “Created by dave” badge no longer shown on the entry screen.
+- **Activity feed (mobile)**: Top-left compact cards, max 2 visible items, smaller text and padding so broadcasts use less map space.
+
 ## [1.9.0]
 
 ### Added
@@ -52,7 +66,7 @@ All notable changes to Pulse are documented here.
 ### Added
 
 - **Megaphone emoji picker**: Smile button in the expanded megaphone bar opens `emoji-picker-react` below the input; emojis append to broadcast text (capped at 100 characters).
-- **Activity feed location**: Broadcast notifications show peer location inline (e.g. *Stranger from California, US*).
+- **Activity feed location**: Broadcast notifications show peer location inline (e.g. _Stranger from California, US_).
 - **SEO metadata**: `metadataBase`, Open Graph, Twitter card, canonical URL, and robots directives in the root layout.
 - **Discoverability**: `app/robots.ts` and `app/sitemap.ts` for crawlers; `NEXT_PUBLIC_APP_URL` env var for production URL.
 - **OG image**: Build-time script generates `public/opengraph-image.png` (1200×630) for link previews.
@@ -102,13 +116,13 @@ All notable changes to Pulse are documented here.
 
 - **Cloudflare TURN**: `/api/ice` issues short-lived relay credentials when `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` are set; falls back to Google STUN otherwise.
 - **Mood on entry**: Optional mood picker on the entry gate (Lucide icons in a two-column card); mood is stored on presence and shown in map hover labels and tooltips.
-- **Typing indicators**: Peer typing state syncs over the WebRTC data channel; shown as *typing…* in the chat panel.
+- **Typing indicators**: Peer typing state syncs over the WebRTC data channel; shown as _typing…_ in the chat panel.
 - **Connection countdown**: Outgoing connection and video requests show an animated timeout bar on the prompt modal.
 - **Screen sharing**: Share your screen during a video call; remote video switches to the shared track and reverts when sharing ends.
 - **Report user**: Flag button in the chat header posts an anonymous report (`/api/report`) for moderation review.
 - **Rate limiting**: Middleware throttles `/api/join`, `/api/signal`, and `/api/report` per IP (in-memory; Redis noted for multi-instance production).
 - **Video busy API**: `/api/busy` lets clients set `busy` while in an active video call so peers see accurate availability.
-- **Reconnect banner**: Poll failures trigger exponential backoff and a top-of-screen *Reconnecting…* notice; join and signal calls surface HTTP errors instead of failing silently.
+- **Reconnect banner**: Poll failures trigger exponential backoff and a top-of-screen _Reconnecting…_ notice; join and signal calls surface HTTP errors instead of failing silently.
 - **PWA**: Web app manifest, theme colors, and generated 192/512 icons for add-to-home-screen.
 - **Privacy warning**: Empty chat state reminds users not to share phone numbers, addresses, passwords, or other private info.
 - **Created-by credit**: Footer credit on the map view, hidden during an active video call.

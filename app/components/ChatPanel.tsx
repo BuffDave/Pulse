@@ -6,6 +6,8 @@ import { createPortal } from "react-dom";
 import type { EmojiClickData } from "emoji-picker-react";
 import { EmojiStyle, Theme } from "emoji-picker-react";
 import {
+  ChevronDown,
+  ChevronUp,
   Flag,
   Heart,
   MessageCircle,
@@ -117,10 +119,19 @@ export default function ChatPanel({
   const reactionLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const peerMsgBaselineRef = useRef(0);
+  const prevMinimizedRef = useRef(minimized);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (embedded && minimized && !prevMinimizedRef.current) {
+      peerMsgBaselineRef.current = messages.filter((m) => !m.mine).length;
+    }
+    prevMinimizedRef.current = minimized;
+  }, [embedded, minimized, messages]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -224,15 +235,73 @@ export default function ChatPanel({
   const showReactionAbove =
     reactionAnchor !== null && reactionAnchor.rect.top > 56;
 
+  const peerMsgCount = messages.filter((m) => !m.mine).length;
+  const newPeerMsgsWhileMinimized = Math.max(
+    0,
+    peerMsgCount - peerMsgBaselineRef.current,
+  );
+  const showEmbeddedActivity =
+    embedded &&
+    minimized &&
+    (isTyping || newPeerMsgsWhileMinimized > 0);
+
   const panelClass = embedded
-    ? "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] portrait:max-w-none landscape:max-w-lg landscape:shrink-0"
+    ? minimized
+      ? "relative flex shrink-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] portrait:h-11 portrait:w-full portrait:flex-row portrait:items-center portrait:px-3 landscape:h-full landscape:w-12 landscape:flex-col landscape:items-center landscape:pt-3"
+      : "relative flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] portrait:min-h-0 portrait:max-w-none landscape:max-w-lg landscape:shrink-0"
     : minimized
       ? "animate-slide-right absolute inset-y-0 right-0 flex w-12 flex-col items-center border-l border-[var(--border-subtle)] bg-[var(--bg-base)]/92 text-[var(--text-primary)] shadow-2xl"
       : "animate-slide-right absolute inset-y-0 right-0 flex w-full max-w-lg flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-base)]/92 pt-12 text-[var(--text-primary)] shadow-2xl md:pt-0";
 
   return (
     <div className={panelClass}>
-      {!embedded && minimized ? (
+      {embedded && minimized ? (
+        <div className="flex h-full w-full portrait:flex-row portrait:items-center portrait:gap-2 landscape:flex-col landscape:items-center landscape:gap-2 landscape:pt-1">
+          {onToggleMinimize && (
+            <button
+              type="button"
+              onClick={onToggleMinimize}
+              aria-label="Open chat"
+              className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--border-default)] text-[var(--text-secondary)] transition duration-200 hover:border-white/20 hover:bg-white/5 hover:text-[var(--text-primary)] landscape:h-9 landscape:w-9"
+            >
+              <ChevronUp
+                className="h-4 w-4 portrait:block landscape:hidden"
+                aria-hidden
+              />
+              <PanelRightOpen
+                className="h-4 w-4 portrait:hidden landscape:block"
+                aria-hidden
+              />
+            </button>
+          )}
+          <p className="min-w-0 flex-1 truncate text-sm font-medium portrait:block landscape:hidden">
+            {peerName}
+          </p>
+          <span className="max-h-[min(40vh,12rem)] truncate text-xs font-medium text-[var(--text-secondary)] [writing-mode:vertical-rl] rotate-180 portrait:hidden landscape:block">
+            {peerName}
+          </span>
+          {showEmbeddedActivity && (
+            <span
+              className="relative flex shrink-0 items-center justify-center portrait:ml-1 landscape:mt-1"
+              aria-label={
+                isTyping
+                  ? "Peer is typing"
+                  : `${newPeerMsgsWhileMinimized} new message${newPeerMsgsWhileMinimized === 1 ? "" : "s"}`
+              }
+            >
+              {newPeerMsgsWhileMinimized > 0 ? (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                  {newPeerMsgsWhileMinimized > 9
+                    ? "9+"
+                    : newPeerMsgsWhileMinimized}
+                </span>
+              ) : (
+                <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse" />
+              )}
+            </span>
+          )}
+        </div>
+      ) : !embedded && minimized ? (
         <div className="flex flex-1 flex-col items-center gap-3 overflow-hidden pt-4">
           {onToggleMinimize && (
             <button
@@ -275,7 +344,41 @@ export default function ChatPanel({
         </div>
       ) : (
         <>
-      {!embedded && (
+      {embedded ? (
+        <header className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/80 px-4 py-2.5 backdrop-blur-md">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-sm font-semibold">{peerName}</p>
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${connected ? "bg-[var(--accent)]" : "animate-pulse bg-amber-400"}`}
+                  aria-hidden
+                />
+              </div>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {connected ? "Connected" : "Connecting…"}
+              </p>
+            </div>
+          </div>
+          {onToggleMinimize && (
+            <button
+              type="button"
+              onClick={onToggleMinimize}
+              aria-label="Minimize chat"
+              className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--border-default)] text-[var(--text-secondary)] transition duration-200 hover:border-white/20 hover:bg-white/5 hover:text-[var(--text-primary)] landscape:h-9 landscape:w-9"
+            >
+              <ChevronDown
+                className="h-4 w-4 portrait:block landscape:hidden"
+                aria-hidden
+              />
+              <PanelRightClose
+                className="h-4 w-4 portrait:hidden landscape:block"
+                aria-hidden
+              />
+            </button>
+          )}
+        </header>
+      ) : (
         <header className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/80 px-4 py-3 backdrop-blur-md">
           <div className="flex min-w-0 items-center gap-3">
             {onToggleMinimize && (
@@ -332,7 +435,10 @@ export default function ChatPanel({
         </header>
       )}
 
-      <div ref={messagesRef} className="flex-1 space-y-2 overflow-y-auto p-4">
+      <div
+        ref={messagesRef}
+        className="pulse-scroll-surface flex-1 space-y-2 overflow-y-auto p-4"
+      >
         {messages.length === 0 && (
           <div className="mt-12 flex flex-col items-center gap-3 text-center">
             <MessageCircle

@@ -896,12 +896,7 @@ export default function Home() {
   }
 
   if (phase === "gate") {
-    return (
-      <>
-        <CreatedByCredit />
-        <EntryGate onReady={handleReady} />
-      </>
-    );
+    return <EntryGate onReady={handleReady} />;
   }
 
   const activeSession = activePeerId
@@ -921,6 +916,8 @@ export default function Home() {
     unread: session.unread,
     active: session.peerId === activePeerId,
   }));
+  const showSidebarChat =
+    chatTabs.length > 0 && videoSession?.video !== "active";
 
   return (
     <main className="fixed inset-0 overflow-hidden">
@@ -958,7 +955,7 @@ export default function Home() {
 
       <ActivityFeed items={broadcastItems} />
 
-      {chatTabs.length > 0 && (
+      {showSidebarChat && (
         <div
           className={`absolute inset-y-0 right-0 z-40 transition-[width] duration-300 ease-in-out ${
             chatMinimized ? "w-12" : "w-full max-w-lg"
@@ -1012,7 +1009,7 @@ export default function Home() {
       {showPrivacyNote && (
         <div
           className={`panel-glass animate-fade-up pointer-events-auto fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-30 flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs text-[var(--text-secondary)] shadow-xl sm:bottom-[calc(7.25rem+env(safe-area-inset-bottom))] ${
-            chatTabs.length > 0 && chatMinimized
+            showSidebarChat && chatMinimized
               ? "left-4 w-[min(calc(100vw-5rem),22rem)] translate-x-0 sm:left-1/2 sm:w-[min(100vw-1.5rem,22rem)] sm:-translate-x-1/2"
               : "left-1/2 w-[min(100vw-1.5rem,22rem)] -translate-x-1/2"
           }`}
